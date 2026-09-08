@@ -161,6 +161,33 @@ const TRON_EXPLORER_BASE_URLS = {
   nile: "https://nile.tronscan.org/#/address/",
 };
 
+async function fetchTrxPaymentQuote({ fiatCurrency }) {
+  try {
+    const currency = String(fiatCurrency || "").toLowerCase();
+    const response = await axios.get("https://api.coingecko.com/api/v3/simple/price", {
+      params: {
+        ids: "tron",
+        vs_currencies: currency,
+      },
+      timeout: 10000,
+    });
+    const price = response.data?.tron?.[currency];
+    if (!Number.isFinite(Number(price)) || Number(price) <= 0) {
+      throw new Error("Price was missing from the quote response");
+    }
+    return {
+      price: String(price),
+      provider: "coingecko",
+      quotedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    const quoteError = new Error("Unable to retrieve a live TRX quote");
+    quoteError.code = "QUOTE_UNAVAILABLE";
+    quoteError.cause = error;
+    throw quoteError;
+  }
+}
+
 const TATUM_DATA_API_URL = process.env.TATUM_DATA_API_URL || "https://api.tatum.io";
 const TATUM_DATA_API_KEY = process.env.TATUM_DATA_API_KEY || process.env.TATUM_API_KEY || "";
 const BSC_WALLET_CACHE_MS = Number(process.env.BSC_WALLET_CACHE_MS || 15000);
@@ -785,6 +812,7 @@ const predictionMarketsService = new PredictionMarketsService();
 const apiKeysService = new APIKeysService();
 const metaTraderService = new MetaTraderService();
 const paymentGateway = new PaymentGatewayService({
+  quoteProvider: fetchTrxPaymentQuote,
   tronDepositAddress: TRON_DEPOSIT_ADDRESS,
   tronNetwork: TRON_NETWORK,
 });
@@ -2363,7 +2391,8 @@ function getExplorerTxUrl(network, hash) {
     return `https://bscscan.com/tx/${normalized}`;
   }
   if (network === "tron") {
-    return `https://tronscan.org/#/transaction/${normalized.replace(/^0x/i, "")}`;
+    const baseUrl = TRON_EXPLORER_BASE_URLS[TRON_NETWORK].replace("/address/", "/transaction/");
+    return `${baseUrl}${normalized.replace(/^0x/i, "")}`;
   }
   return null;
 }
@@ -2433,12 +2462,13 @@ async function verifyTronTransaction(hash) {
 
   if (!tx) {
     return {
-      network: "tron",
+      chain: "tron",
+      network: TRON_NETWORK,
       hash: txHash,
       explorerUrl: getExplorerTxUrl("tron", txHash),
       found: false,
       chainIdHex,
-      message: "Transaction hash not found on Tron network",
+      message: `Transaction hash not found on TRON ${TRON_NETWORK}`,
     };
   }
 
@@ -2447,7 +2477,8 @@ async function verifyTronTransaction(hash) {
   const confirmations = txBlock ? Math.max(0, latestBlock - txBlock + 1) : 0;
 
   return {
-    network: "tron",
+    chain: "tron",
+    network: TRON_NETWORK,
     hash: txHash,
     explorerUrl: getExplorerTxUrl("tron", txHash),
     found: true,
@@ -4227,7 +4258,8 @@ app.get("/api/tron/block-number", auth, async (_req, res, next) => {
   try {
     const blockHex = await callTronRpcWithRetry("eth_blockNumber", [], 2);
     return res.json({
-      source: "tatum-tron-mainnet-gateway",
+      source: `tatum-tron-${TRON_NETWORK}-gateway`,
+      network: TRON_NETWORK,
       blockNumberHex: blockHex,
       blockNumber: parseInt(blockHex, 16),
     });
@@ -5988,7 +6020,8 @@ app.post("/api/tron/send", auth, async (req, res) => {
     res.json({
       success: true,
       txHash: result.txid || result,
-      network: "tron",
+      chain: "tron",
+      network: TRON_NETWORK,
     });
   } catch (error) {
     console.error("Error sending TRX:", error);
@@ -6011,7 +6044,8 @@ app.post("/api/tron/send-token", auth, async (req, res) => {
     res.json({
       success: true,
       txHash: result.txid || result,
-      network: "tron",
+      chain: "tron",
+      network: TRON_NETWORK,
       tokenAddress,
     });
   } catch (error) {
@@ -6364,7 +6398,7 @@ function getExplorerUrl(chain, txHash) {
     ethereum: `https://etherscan.io/tx/${txHash}`,
     bsc: `https://bscscan.com/tx/${txHash}`,
     solana: `https://solscan.io/tx/${txHash}`,
-    tron: `https://tronscan.org/#/transaction/${txHash}`,
+    tron: getExplorerTxUrl("tron", txHash),
   };
   return explorers[chain] || null;
 }
@@ -9108,7 +9142,7 @@ app.post(
       .isIn(["USD", "EUR", "GBP", "AED", "AUD", "CAD", "JPY", "CHF"])
       .withMessage("Unsupported currency"),
     body("method")
-      .isIn(["card", "bank_transfer", "paypal", "crypto", "apple_pay", "google_pay", "sepa", "wire"])
+      .isIn(["card", "bank_transfer", "paypal", "apple_pay", "google_pay", "sepa", "wire"])
       .withMessage("Unsupported method"),
   ],
   async (req, res) => {
@@ -9142,9 +9176,13 @@ app.post(
 // POST /api/payments/crypto — create crypto payment address
 app.post(
   "/api/payments/crypto",
+  rateLimiters.blockchain,
   auth,
   [
-    body("amount").isFloat({ min: 0.01 }),
+    body("amount")
+      .isString()
+      .matches(/^(?:0|[1-9]\d{0,8})(?:\.\d{1,8})?$/)
+      .withMessage("amount must be a positive decimal string"),
     body("currency").isIn(["USD", "EUR", "GBP", "AED", "AUD", "CAD", "JPY", "CHF"]),
     body("cryptoSymbol").isIn(["BTC", "ETH", "USDT", "BNB", "SOL", "TRX", "ATX"]),
   ],
@@ -9156,7 +9194,6 @@ app.post(
       const payment = await paymentGateway.createCryptoPayment({
         amount,
         currency,
-        cryptoAmount: req.body.cryptoAmount,
         cryptoSymbol,
         metadata,
       });
@@ -9167,6 +9204,7 @@ app.post(
         cryptoAmount: payment.cryptoAmount,
         cryptoSymbol: payment.cryptoSymbol,
         network: payment.network,
+        quote: payment.quote,
         quoteMode: payment.quoteMode,
       };
       const stmt = db.prepare(
@@ -9186,7 +9224,7 @@ app.post(
       );
       res.json({ success: true, payment });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(err.code === "QUOTE_UNAVAILABLE" ? 502 : 400).json({ error: err.message });
     }
   }
 );

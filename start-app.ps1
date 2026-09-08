@@ -54,7 +54,7 @@ if (Test-Path ".env") {
 
 Write-Host "📍 Port: $port" -ForegroundColor White
 Write-Host "🌐 Local URL: http://localhost:$port" -ForegroundColor White
-Write-Host "🔗 Production URL: https://erc.dog" -ForegroundColor White
+Write-Host "🔗 Production URL: https://atlasx.online" -ForegroundColor White
 Write-Host ""
 
 Write-Host "🎯 Available Features:" -ForegroundColor Cyan

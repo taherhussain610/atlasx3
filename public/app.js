@@ -1228,9 +1228,6 @@ function renderPgFields() {
           <option value="ATX">ATX</option>
         </select>
       </label>
-      <label>Exact TRX Amount
-        <input id="pgCryptoAmount" type="number" min="0.000001" step="0.000001" placeholder="Required for TRX" />
-      </label>
     `,
     bank_transfer: `
       <label>Account Name
@@ -4601,7 +4598,8 @@ async function submitPaymentGateway() {
     return null;
   }
 
-  const amount = Number(document.getElementById("pgAmount")?.value || 0);
+  const amountInput = String(document.getElementById("pgAmount")?.value || "").trim();
+  const amount = Number(amountInput);
   const currency = String(document.getElementById("pgCurrency")?.value || "USD").toUpperCase();
   const method = state.pgMethod || "card";
 
@@ -4614,9 +4612,8 @@ async function submitPaymentGateway() {
   const payload =
     method === "crypto"
       ? {
-          amount,
+          amount: amountInput,
           currency,
-          cryptoAmount: String(document.getElementById("pgCryptoAmount")?.value || "").trim(),
           cryptoSymbol: String(document.getElementById("pgCryptoSymbol")?.value || "BTC").toUpperCase(),
         }
       : { amount, currency, method };

@@ -140,28 +140,42 @@ test("ATLASX3 routes TRX payments to its configured receiving wallet", async () 
   assert.match(serverSource, /row\.method === "crypto"/);
   assert.match(appSource, /row\.method === "crypto"/);
 
+  let quoteRequest;
   const service = new PaymentGatewayService({
+    quoteProvider: async (request) => {
+      quoteRequest = request;
+      return {
+        price: "0.12",
+        provider: "test",
+        quotedAt: "2026-09-08T09:31:10.678Z",
+      };
+    },
     tronDepositAddress: address,
     tronNetwork: "mainnet",
   });
   const trxPayment = await service.createCryptoPayment({
-    amount: 12,
+    amount: "12",
     currency: "USD",
-    cryptoAmount: "12.123456",
     cryptoSymbol: "TRX",
   });
   assert.equal(trxPayment.address, address);
-  assert.equal(trxPayment.cryptoAmount, "12.123456");
+  assert.equal(trxPayment.cryptoAmount, "100");
   assert.equal(
     trxPayment.qrData,
     `trx:${address}?amount=${trxPayment.cryptoAmount}`,
   );
   assert.equal(trxPayment.network, "mainnet");
   assert.equal(trxPayment.autoCredit, false);
-  assert.equal(trxPayment.quoteMode, "manual");
+  assert.equal(trxPayment.quoteMode, "live");
+  assert.equal(trxPayment.quote.provider, "test");
+  assert.deepEqual(quoteRequest, {
+    cryptoSymbol: "TRX",
+    fiatAmount: "12",
+    fiatCurrency: "USD",
+  });
 
   const btcPayment = await service.createCryptoPayment({
-    amount: 100,
+    amount: "100",
     currency: "USD",
     cryptoSymbol: "BTC",
   });
@@ -172,21 +186,26 @@ test("ATLASX3 routes TRX payments to its configured receiving wallet", async () 
 
   await assert.rejects(
     new PaymentGatewayService().createCryptoPayment({
-      amount: 12,
+      amount: "12",
       currency: "USD",
-      cryptoAmount: "12",
       cryptoSymbol: "TRX",
     }),
     /TRX receiving wallet is not configured/,
   );
+  const roundedPayment = await service.createCryptoPayment({
+    amount: "0.01",
+    currency: "USD",
+    cryptoSymbol: "TRX",
+  });
+  assert.equal(roundedPayment.cryptoAmount, "0.083334");
+  assert.match(roundedPayment.cryptoAmount, /^\d+(?:\.\d{1,6})?$/);
   await assert.rejects(
-    service.createCryptoPayment({
+    service.createPayment({
       amount: 12,
       currency: "USD",
-      cryptoAmount: "0.1234567",
-      cryptoSymbol: "TRX",
+      method: "crypto",
     }),
-    /no more than 6 decimal places/,
+    /dedicated crypto payment flow/,
   );
 });
 

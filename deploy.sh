@@ -92,16 +92,20 @@ echo ""
 echo "Step 3: Copying application files..."
 echo "--------------------------------------"
 
-# Copy files (modify source path as needed)
-SOURCE_DIR="D:/crypto/atlasx3"
-if [ -d "$SOURCE_DIR" ]; then
+# Copy files from this checkout
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ ! -f "$SOURCE_DIR/package.json" ]; then
+    print_error "Source checkout is missing package.json: $SOURCE_DIR"
+    exit 1
+fi
+if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
     # Using rsync for better copying
     rsync -av --exclude 'node_modules' --exclude '.git' \
           --exclude 'logs/*' --exclude 'data/*.db' \
           "$SOURCE_DIR/" "$APP_DIR/"
     print_success "Application files copied"
 else
-    print_warning "Source directory not found. Please copy files manually to $APP_DIR"
+    print_success "Application is already running from $APP_DIR"
 fi
 
 echo ""

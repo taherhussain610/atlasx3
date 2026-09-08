@@ -57,7 +57,7 @@ module.exports = {
   deploy: {
     production: {
       user: "ubuntu",
-      host: "erc.dog",
+      host: "atlasx.online",
       ref: "origin/main",
       repo: "git@github.com:taherhussain610/atlasx3.git",
       path: "/var/www/atlasx3",
