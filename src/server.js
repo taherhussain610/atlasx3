@@ -71,6 +71,8 @@ function resolvePort() {
 }
 
 const PORT = resolvePort();
+const APP_NAME = "ATLASX3";
+const APP_SERVICE_NAME = "atlasx3-api";
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
 const NODE_ENV = process.env.NODE_ENV || "development";
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
@@ -87,7 +89,13 @@ const BSC_RPC_FALLBACK_URL =
 const BSC_RPC_API_KEY = process.env.BSC_RPC_API_KEY || process.env.TATUM_API_KEY || "";
 
 // TRON Configuration
-const TRON_NETWORK = process.env.TRON_NETWORK || "mainnet";
+const TRON_NETWORK = String(process.env.TRON_NETWORK || "mainnet")
+  .trim()
+  .toLowerCase();
+const SUPPORTED_TRON_NETWORKS = ["mainnet", "shasta", "nile"];
+if (!SUPPORTED_TRON_NETWORKS.includes(TRON_NETWORK)) {
+  throw new Error(`Invalid TRON_NETWORK '${TRON_NETWORK}'. Use mainnet, shasta, or nile.`);
+}
 const TRON_RPC_API_KEY = process.env.TRON_RPC_API_KEY || process.env.TATUM_API_KEY || "";
 
 // TRON Mainnet Endpoints
@@ -133,6 +141,24 @@ const TRON_ENDPOINTS = {
     wallet: TRON_NILE_WALLET,
     walletsolidity: TRON_NILE_WALLETSOLIDITY,
   },
+};
+
+const DEFAULT_TRON_MAINNET_DEPOSIT_ADDRESS = "TXntJR1XuF3VeY6uZZ3i8uRYTLy6g7mMmZ";
+const TRON_DEPOSIT_ADDRESSES = {
+  mainnet: String(
+    process.env.TRON_MAINNET_DEPOSIT_ADDRESS || DEFAULT_TRON_MAINNET_DEPOSIT_ADDRESS
+  ).trim(),
+  shasta: String(process.env.TRON_SHASTA_DEPOSIT_ADDRESS || "").trim(),
+  nile: String(process.env.TRON_NILE_DEPOSIT_ADDRESS || "").trim(),
+};
+const TRON_DEPOSIT_ADDRESS = TRON_DEPOSIT_ADDRESSES[TRON_NETWORK];
+if (TRON_DEPOSIT_ADDRESS && !WalletService.isValidTronAddress(TRON_DEPOSIT_ADDRESS)) {
+  throw new Error(`Invalid TRON ${TRON_NETWORK} deposit address.`);
+}
+const TRON_EXPLORER_BASE_URLS = {
+  mainnet: "https://tronscan.org/#/address/",
+  shasta: "https://shasta.tronscan.org/#/address/",
+  nile: "https://nile.tronscan.org/#/address/",
 };
 
 const TATUM_DATA_API_URL = process.env.TATUM_DATA_API_URL || "https://api.tatum.io";
@@ -758,7 +784,10 @@ const copyTradingService = new CopyTradingService();
 const predictionMarketsService = new PredictionMarketsService();
 const apiKeysService = new APIKeysService();
 const metaTraderService = new MetaTraderService();
-const paymentGateway = new PaymentGatewayService();
+const paymentGateway = new PaymentGatewayService({
+  tronDepositAddress: TRON_DEPOSIT_ADDRESS,
+  tronNetwork: TRON_NETWORK,
+});
 const paymentTerminalService = new PaymentTerminalService();
 const assistantService = new AssistantService();
 
@@ -2851,7 +2880,7 @@ app.get("/api/chart/series", auth, async (req, res, next) => {
 });
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, service: "crypto-exchange-api" });
+  res.json({ ok: true, name: APP_NAME, service: APP_SERVICE_NAME });
 });
 
 app.get("/api/assistant/status", auth, (_req, res) => {
@@ -2880,7 +2909,8 @@ app.post("/api/assistant/chat", auth, async (req, res) => {
 
 app.get("/api/port-status", (_req, res) => {
   res.json({
-    service: "crypto-exchange-api",
+    name: APP_NAME,
+    service: APP_SERVICE_NAME,
     port: PORT,
     host: "localhost",
     baseUrl: `http://localhost:${PORT}`,
@@ -4168,11 +4198,26 @@ app.get("/api/bsc/config", auth, (_req, res) => {
   });
 });
 
+app.get("/api/tron/deposit-wallet", (_req, res) => {
+  res.json({
+    address: TRON_DEPOSIT_ADDRESS || null,
+    configured: Boolean(TRON_DEPOSIT_ADDRESS),
+    currency: "TRX",
+    network: TRON_NETWORK,
+    explorerUrl: TRON_DEPOSIT_ADDRESS
+      ? `${TRON_EXPLORER_BASE_URLS[TRON_NETWORK]}${encodeURIComponent(TRON_DEPOSIT_ADDRESS)}`
+      : null,
+    autoCredit: false,
+  });
+});
+
 app.get("/api/tron/config", auth, (_req, res) => {
   const networkInfo = tronService.getNetworkInfo();
   res.json({
     network: networkInfo.network,
     endpoints: networkInfo.endpoints,
+    depositAddress: TRON_DEPOSIT_ADDRESS || null,
+    depositAddressConfigured: Boolean(TRON_DEPOSIT_ADDRESS),
     usingApiKey: networkInfo.apiKey !== "none",
     apiKeyPreview: networkInfo.apiKey,
   });
@@ -10063,8 +10108,8 @@ app.use((err, req, res, _next) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Crypto exchange API running on http://localhost:${PORT}`);
-  console.log(`WebSocket server ready for real-time updates`);
+  console.log(`${APP_NAME} API running on http://localhost:${PORT}`);
+  console.log(`${APP_NAME} WebSocket server ready for real-time updates`);
   if (JWT_SECRET === "dev-secret-change-me") {
     console.warn(
       "Warning: using default JWT secret. Set JWT_SECRET in .env for production-like use."
