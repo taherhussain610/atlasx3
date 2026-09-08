@@ -1145,6 +1145,14 @@ function getPgMethodLabel(method = "card") {
 }
 
 function normalizePaymentRecord(record = {}) {
+  const parsedMetadata =
+    typeof record.metadata === "string"
+      ? safeJsonParse(record.metadata, {})
+      : record.metadata || {};
+  const metadata =
+    parsedMetadata && typeof parsedMetadata === "object" && !Array.isArray(parsedMetadata)
+      ? parsedMetadata
+      : {};
   return {
     id: String(record.id || `PAY_${Date.now()}`),
     method: String(record.method || (record.cryptoSymbol ? "crypto" : "card")),
@@ -1154,11 +1162,11 @@ function normalizePaymentRecord(record = {}) {
     created_at: record.created_at || record.createdAt || new Date().toISOString(),
     instructions: record.instructions || "",
     qr_data: record.qr_data || record.qrData || "",
-    cryptoAmount: record.cryptoAmount || "",
-    cryptoSymbol: record.cryptoSymbol || "",
-    address: record.address || "",
-    network: record.network || "",
-    autoCredit: record.autoCredit === true,
+    cryptoAmount: record.cryptoAmount || metadata.cryptoAmount || "",
+    cryptoSymbol: record.cryptoSymbol || metadata.cryptoSymbol || "",
+    address: record.address || metadata.address || "",
+    network: record.network || metadata.network || "",
+    autoCredit: (record.autoCredit ?? metadata.autoCredit) === true,
   };
 }
 
@@ -1219,6 +1227,9 @@ function renderPgFields() {
           <option value="TRX">TRX</option>
           <option value="ATX">ATX</option>
         </select>
+      </label>
+      <label>Exact TRX Amount
+        <input id="pgCryptoAmount" type="number" min="0.000001" step="0.000001" placeholder="Required for TRX" />
       </label>
     `,
     bank_transfer: `
@@ -1297,6 +1308,7 @@ function renderPgSummary(payment = null) {
   const summaryLines = [
     `${formatPlainNumber(normalized.amount, 2)} ${normalized.currency}`,
     normalized.status,
+    normalized.network ? `${normalized.network.toUpperCase()} network` : "",
     normalized.instructions ||
       (normalized.cryptoAmount && normalized.cryptoSymbol
         ? `${normalized.cryptoAmount} ${normalized.cryptoSymbol}`
@@ -4604,6 +4616,7 @@ async function submitPaymentGateway() {
       ? {
           amount,
           currency,
+          cryptoAmount: String(document.getElementById("pgCryptoAmount")?.value || "").trim(),
           cryptoSymbol: String(document.getElementById("pgCryptoSymbol")?.value || "BTC").toUpperCase(),
         }
       : { amount, currency, method };

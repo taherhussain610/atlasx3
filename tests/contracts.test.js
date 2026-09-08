@@ -147,15 +147,18 @@ test("ATLASX3 routes TRX payments to its configured receiving wallet", async () 
   const trxPayment = await service.createCryptoPayment({
     amount: 12,
     currency: "USD",
+    cryptoAmount: "12.123456",
     cryptoSymbol: "TRX",
   });
   assert.equal(trxPayment.address, address);
+  assert.equal(trxPayment.cryptoAmount, "12.123456");
   assert.equal(
     trxPayment.qrData,
     `trx:${address}?amount=${trxPayment.cryptoAmount}`,
   );
   assert.equal(trxPayment.network, "mainnet");
   assert.equal(trxPayment.autoCredit, false);
+  assert.equal(trxPayment.quoteMode, "manual");
 
   const btcPayment = await service.createCryptoPayment({
     amount: 100,
@@ -171,9 +174,19 @@ test("ATLASX3 routes TRX payments to its configured receiving wallet", async () 
     new PaymentGatewayService().createCryptoPayment({
       amount: 12,
       currency: "USD",
+      cryptoAmount: "12",
       cryptoSymbol: "TRX",
     }),
     /TRX receiving wallet is not configured/,
+  );
+  await assert.rejects(
+    service.createCryptoPayment({
+      amount: 12,
+      currency: "USD",
+      cryptoAmount: "0.1234567",
+      cryptoSymbol: "TRX",
+    }),
+    /no more than 6 decimal places/,
   );
 });
 

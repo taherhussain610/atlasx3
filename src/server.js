@@ -9156,9 +9156,19 @@ app.post(
       const payment = await paymentGateway.createCryptoPayment({
         amount,
         currency,
+        cryptoAmount: req.body.cryptoAmount,
         cryptoSymbol,
         metadata,
       });
+      const paymentMetadata = {
+        ...(metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata : {}),
+        address: payment.address,
+        autoCredit: payment.autoCredit,
+        cryptoAmount: payment.cryptoAmount,
+        cryptoSymbol: payment.cryptoSymbol,
+        network: payment.network,
+        quoteMode: payment.quoteMode,
+      };
       const stmt = db.prepare(
         "INSERT INTO payments (id, user_id, method, amount, currency, status, reference, qr_data, instructions, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       );
@@ -9171,8 +9181,8 @@ app.post(
         "awaiting_payment",
         payment.id,
         payment.qrData,
-        `Pay ${payment.cryptoAmount} ${payment.cryptoSymbol} to ${payment.address}`,
-        JSON.stringify(metadata)
+        `Pay ${payment.cryptoAmount} ${payment.cryptoSymbol}${payment.network ? ` on ${payment.network}` : ""} to ${payment.address}`,
+        JSON.stringify(paymentMetadata)
       );
       res.json({ success: true, payment });
     } catch (err) {

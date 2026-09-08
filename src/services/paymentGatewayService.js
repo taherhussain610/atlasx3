@@ -98,7 +98,13 @@ class PaymentGatewayService {
   }
 
   /** Process a crypto payment address request */
-  async createCryptoPayment({ amount, currency, cryptoSymbol, metadata = {} }) {
+  async createCryptoPayment({
+    amount,
+    currency,
+    cryptoAmount: requestedCryptoAmount,
+    cryptoSymbol,
+    metadata = {},
+  }) {
     const symbol = (cryptoSymbol || "").toUpperCase();
     if (!SUPPORTED_CRYPTO_PAY.includes(symbol)) {
       throw new Error(`Unsupported crypto: ${cryptoSymbol}`);
@@ -109,8 +115,10 @@ class PaymentGatewayService {
     }
 
     const ref = this._ref("CPAY");
-    const rate = MOCK_CRYPTO_RATES[symbol] || 1;
-    const cryptoAmount = (Number(amount) / rate).toFixed(8);
+    const cryptoAmount =
+      symbol === "TRX"
+        ? this._normalizeTrxAmount(requestedCryptoAmount)
+        : (Number(amount) / (MOCK_CRYPTO_RATES[symbol] || 1)).toFixed(8);
 
     return {
       id: ref,
@@ -123,6 +131,7 @@ class PaymentGatewayService {
       qrData: `${symbol.toLowerCase()}:${address}?amount=${cryptoAmount}`,
       network: symbol === "TRX" ? this.tronNetwork : null,
       autoCredit: false,
+      quoteMode: symbol === "TRX" ? "manual" : "sandbox",
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       metadata,
       mock: true,
@@ -187,6 +196,17 @@ class PaymentGatewayService {
       wire: `Wire transfer of ${amount} ${currency} — allow 1-3 business days`,
     };
     return map[method] || `Pay ${amount} ${currency}`;
+  }
+
+  _normalizeTrxAmount(amount) {
+    const value = String(amount ?? "").trim();
+    if (
+      !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(value) ||
+      Number(value) <= 0
+    ) {
+      throw new Error("TRX amount must be positive and use no more than 6 decimal places");
+    }
+    return value;
   }
 
   _mockAddress(symbol) {
