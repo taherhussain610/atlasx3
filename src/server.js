@@ -9221,6 +9221,11 @@ app.post("/api/payments/:id/confirm", auth, (req, res) => {
   try {
     const row = db.prepare("SELECT * FROM payments WHERE id = ? AND user_id = ?").get(req.params.id, req.user.id);
     if (!row) return res.status(404).json({ error: "Payment not found" });
+    if (row.method === "crypto") {
+      return res.status(409).json({
+        error: "Crypto payments require on-chain verification and cannot be self-confirmed",
+      });
+    }
     db.prepare("UPDATE payments SET status = 'completed', completed_at = datetime('now') WHERE id = ?").run(
       req.params.id
     );

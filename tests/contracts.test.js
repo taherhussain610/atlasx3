@@ -9,6 +9,7 @@ const APIKeysService = require("../src/services/apiKeysService");
 const CopyTradingService = require("../src/services/copyTradingService");
 const DemoTradingService = require("../src/services/demoTradingService");
 const MarginTradingService = require("../src/services/marginTradingService");
+const PaymentGatewayService = require("../src/services/paymentGatewayService");
 const PaymentTerminalService = require("../src/services/paymentTerminalService");
 const P2PTradingService = require("../src/services/p2pTradingService");
 const TokenSwapService = require("../src/services/tokenSwapService");
@@ -25,6 +26,13 @@ const indexSource = fs.readFileSync(
 const serverSource = fs.readFileSync(
   path.join(__dirname, "..", "src", "server.js"),
   "utf8",
+);
+const envExampleSource = fs.readFileSync(
+  path.join(__dirname, "..", ".env.example"),
+  "utf8",
+);
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
 );
 const hardhatContractSource = fs.readFileSync(
   path.join(__dirname, "..", "hardhat", "contracts", "ERCAssetRegistry.sol"),
@@ -114,6 +122,59 @@ test("wallet import derives all supported addresses from a valid mnemonic", () =
   assert.equal(wallet.bsc.address, wallet.ethereum.address);
   assert.ok(wallet.solana.address);
   assert.ok(wallet.tron.address);
+});
+
+test("ATLASX3 routes TRX payments to its configured receiving wallet", async () => {
+  const address = "TXntJR1XuF3VeY6uZZ3i8uRYTLy6g7mMmZ";
+  assert.equal(packageJson.name, "atlasx3");
+  assert.equal(WalletService.isValidTronAddress(address), true);
+  assert.equal(WalletService.isValidTronAddress("T-invalid"), false);
+  assert.match(
+    envExampleSource,
+    new RegExp(`TRON_MAINNET_DEPOSIT_ADDRESS=${address}`),
+  );
+  assert.match(indexSource, /<title>ATLASX3<\/title>/);
+  assert.match(indexSource, /id="tronDepositAddress"/);
+  assert.match(appSource, /\/api\/tron\/deposit-wallet/);
+  assert.match(serverSource, /app\.get\("\/api\/tron\/deposit-wallet"/);
+  assert.match(serverSource, /row\.method === "crypto"/);
+  assert.match(appSource, /row\.method === "crypto"/);
+
+  const service = new PaymentGatewayService({
+    tronDepositAddress: address,
+    tronNetwork: "mainnet",
+  });
+  const trxPayment = await service.createCryptoPayment({
+    amount: 12,
+    currency: "USD",
+    cryptoSymbol: "TRX",
+  });
+  assert.equal(trxPayment.address, address);
+  assert.equal(
+    trxPayment.qrData,
+    `trx:${address}?amount=${trxPayment.cryptoAmount}`,
+  );
+  assert.equal(trxPayment.network, "mainnet");
+  assert.equal(trxPayment.autoCredit, false);
+
+  const btcPayment = await service.createCryptoPayment({
+    amount: 100,
+    currency: "USD",
+    cryptoSymbol: "BTC",
+  });
+  assert.match(
+    btcPayment.qrData,
+    new RegExp(`^btc:${btcPayment.address}\\?amount=`),
+  );
+
+  await assert.rejects(
+    new PaymentGatewayService().createCryptoPayment({
+      amount: 12,
+      currency: "USD",
+      cryptoSymbol: "TRX",
+    }),
+    /TRX receiving wallet is not configured/,
+  );
 });
 
 test("margin positions expose the fields consumed by the UI", () => {

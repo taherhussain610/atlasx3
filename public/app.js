@@ -1404,7 +1404,9 @@ function renderPaymentHistory() {
   body.innerHTML = state.pgPayments.length
     ? state.pgPayments
         .map((row) => {
-          const confirmDisabled = ["completed", "partially_refunded", "refunded"].includes(row.status);
+          const confirmDisabled =
+            row.method === "crypto" ||
+            ["completed", "partially_refunded", "refunded"].includes(row.status);
           const refundDisabled = !["completed", "partially_refunded"].includes(row.status);
           return `
             <tr>
