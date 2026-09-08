@@ -236,6 +236,25 @@ function showToast(message, tone = "positive") {
   setConnectionStatus(message, tone);
 }
 
+async function copyAddress(address, label = "Address") {
+  const value = String(address || "").trim();
+  if (!value) {
+    showToast(`${label} is unavailable`, "warning");
+    return;
+  }
+  if (!navigator.clipboard?.writeText) {
+    showToast("Clipboard access is unavailable", "warning");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast(`${label} copied`, "positive");
+  } catch {
+    showToast(`Unable to copy ${label.toLowerCase()}`, "negative");
+  }
+}
+
 function syncFollowingState(following = []) {
   const normalized = Array.isArray(following) ? following : [];
   state.following = normalized;
@@ -1138,6 +1157,8 @@ function normalizePaymentRecord(record = {}) {
     cryptoAmount: record.cryptoAmount || "",
     cryptoSymbol: record.cryptoSymbol || "",
     address: record.address || "",
+    network: record.network || "",
+    autoCredit: record.autoCredit === true,
   };
 }
 
@@ -1283,11 +1304,27 @@ function renderPgSummary(payment = null) {
   ].filter(Boolean);
 
   if (qrDisplay) {
+    const receivingAddress = normalized.address
+      ? `
+        <strong>Receiving address</strong>
+        <code class="wallet-address">${escapeHtml(normalized.address)}</code>
+        <button
+          type="button"
+          class="secondary"
+          data-action="copy-address"
+          data-address="${escapeHtml(normalized.address)}"
+          data-copy-label="${escapeHtml(`${normalized.cryptoSymbol || "Crypto"} receiving address`)}"
+        >
+          Copy address
+        </button>
+      `
+      : "";
     qrDisplay.innerHTML = normalized.qr_data
       ? `
         <div class="pg-qr-box">
           <div style="font-size: 48px;">${escapeHtml(normalized.method === "crypto" ? "₿" : "💳")}</div>
           <div>${escapeHtml(normalized.qr_data)}</div>
+          ${receivingAddress}
         </div>
       `
       : `
@@ -1299,12 +1336,62 @@ function renderPgSummary(payment = null) {
   }
 
   if (instructions) {
+    const manualSettlementNotice =
+      normalized.cryptoSymbol === "TRX" && !normalized.autoCredit
+        ? '<p class="meta">TRX transfers require manual verification and do not automatically credit your exchange balance.</p>'
+        : "";
     instructions.innerHTML = `
       <article>
         <strong>${escapeHtml(normalized.id)}</strong>
         <p class="meta">${escapeHtml(summaryLines.join(" · "))}</p>
+        ${manualSettlementNotice}
       </article>
     `;
+  }
+}
+
+async function loadTronDepositWallet() {
+  const addressNode = document.getElementById("tronDepositAddress");
+  const networkNode = document.getElementById("tronDepositNetwork");
+  const copyButton = document.getElementById("copyTronDepositAddress");
+  const explorerLink = document.getElementById("tronDepositExplorer");
+
+  try {
+    const wallet = await apiCall("/api/tron/deposit-wallet", {
+      key: "tron-deposit-wallet",
+      skipAuthRedirect: true,
+    });
+    const address = wallet.configured ? String(wallet.address || "") : "";
+
+    if (addressNode) {
+      addressNode.textContent = address || "Not configured";
+    }
+    if (networkNode) {
+      networkNode.textContent = String(wallet.network || "unknown").toUpperCase();
+    }
+    if (copyButton) {
+      copyButton.dataset.address = address;
+      copyButton.disabled = !address;
+    }
+    if (explorerLink) {
+      explorerLink.hidden = !address || !wallet.explorerUrl;
+      if (!explorerLink.hidden) {
+        explorerLink.href = wallet.explorerUrl;
+      }
+    }
+  } catch {
+    if (addressNode) {
+      addressNode.textContent = "Unavailable";
+    }
+    if (networkNode) {
+      networkNode.textContent = "Unavailable";
+    }
+    if (copyButton) {
+      copyButton.disabled = true;
+    }
+    if (explorerLink) {
+      explorerLink.hidden = true;
+    }
   }
 }
 
@@ -4855,6 +4942,11 @@ function bindGlobalHandlers() {
       return;
     }
 
+    if (action === "copy-address") {
+      await copyAddress(target.dataset.address, target.dataset.copyLabel || "Address");
+      return;
+    }
+
     if (action === "refresh-dashboard") {
       await refreshDashboard();
       return;
@@ -5949,6 +6041,7 @@ async function bootstrap() {
   bindGlobalHandlers();
   connectWebSocket();
   appendAssistantMessage("assistant", "AtlasX assistant ready. Ask for risk summaries, on-chain status or desk workflows.");
+  await loadTronDepositWallet();
   await loadAssistantStatus().catch(() => null);
   await hydrateSession();
 }

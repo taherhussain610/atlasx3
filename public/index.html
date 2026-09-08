@@ -562,6 +562,7 @@
       .adv-badge.bad { background: rgba(255, 107, 122, 0.15); color: var(--danger); }
       .pg-method-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
       .pg-qr-box { background: var(--hover); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-family: monospace; font-size: 12px; word-break: break-all; text-align: center; }
+      .wallet-address { display: block; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--hover); font-family: monospace; font-size: 0.9rem; overflow-wrap: anywhere; }
       #nftGrid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap:12px; }
       .status-dot-online { color: #22c55e; }
       .status-dot-offline { color: #ef4444; }
@@ -1592,6 +1593,42 @@
 
         <section class="dashboard-section" id="walletPanel">
           <div class="grid">
+            <div class="panel span-12">
+              <h3>ATLASX3 TRX Receiving Wallet</h3>
+              <p class="meta">
+                Send native TRX only on the network shown below. Transfers require manual verification and do not automatically credit your exchange balance.
+              </p>
+              <div class="field-grid">
+                <div class="summary-card">
+                  <span class="meta">Network</span>
+                  <strong id="tronDepositNetwork">Loading…</strong>
+                </div>
+                <div class="summary-card" style="grid-column: span 2;">
+                  <span class="meta">Receiving address</span>
+                  <code class="wallet-address" id="tronDepositAddress" aria-live="polite">Loading…</code>
+                </div>
+              </div>
+              <div class="button-row" style="margin-top: 12px;">
+                <button
+                  type="button"
+                  data-action="copy-address"
+                  data-copy-label="TRX receiving address"
+                  id="copyTronDepositAddress"
+                  disabled
+                >
+                  Copy address
+                </button>
+                <a
+                  class="pill"
+                  id="tronDepositExplorer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  hidden
+                >
+                  View on TRONSCAN
+                </a>
+              </div>
+            </div>
             <div class="panel span-4">
               <h3>Generate Wallet</h3>
               <form id="walletGenerateForm">
