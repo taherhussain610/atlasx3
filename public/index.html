@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AtlasX Exchange Terminal</title>
+    <title>ATLASX3</title>
     <style>
       :root {
         color-scheme: dark;
@@ -43,7 +43,7 @@
       .app-shell {
         min-height: 100vh;
         display: grid;
-        grid-template-columns: 196px 1fr;
+        grid-template-columns: 188px 1fr;
       }
 
       .sidebar {
@@ -108,6 +108,24 @@
         gap: 1px;
       }
 
+      .nav-search {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .nav-search input {
+        min-height: 26px;
+        padding: 4px 7px;
+        font-size: 0.72rem;
+        border-radius: 6px;
+      }
+
+      .nav-empty {
+        margin: 8px 6px;
+        font-size: 0.7rem;
+        color: var(--muted);
+      }
+
       .sidebar nav::-webkit-scrollbar { width: 4px; }
       .sidebar nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
@@ -143,6 +161,12 @@
         transition: background 0.15s, color 0.15s, border-color 0.15s;
       }
 
+      .nav-link {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .nav-link:hover {
         background: rgba(57, 208, 255, 0.07);
         color: var(--text);
@@ -159,6 +183,7 @@
 
       .main {
         padding: 18px 20px;
+        min-width: 0;
       }
 
       button,
@@ -341,10 +366,61 @@
         font-weight: 600;
         border-radius: 8px;
         white-space: nowrap;
-        transition: opacity 0.15s;
+        transition: opacity 0.15s, transform 0.15s, border-color 0.15s;
       }
 
-      button:hover { opacity: 0.88; }
+      button:hover:not(:disabled) {
+        opacity: 0.9;
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .dashboard-tabs {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        margin: 10px 0 14px;
+        padding: 5px;
+        gap: 3px;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: rgba(7, 15, 27, 0.95);
+        scrollbar-width: thin;
+      }
+
+      .dashboard-tabs .dashboard-tab {
+        width: auto;
+        min-height: 25px;
+        flex: 0 0 auto;
+        padding: 3px 7px;
+        white-space: nowrap;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
 
       button.secondary,
       .pill {
@@ -562,6 +638,7 @@
       .adv-badge.bad { background: rgba(255, 107, 122, 0.15); color: var(--danger); }
       .pg-method-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
       .pg-qr-box { background: var(--hover); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-family: monospace; font-size: 12px; word-break: break-all; text-align: center; }
+      .wallet-address { display: block; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--hover); font-family: monospace; font-size: 0.9rem; overflow-wrap: anywhere; }
       #nftGrid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap:12px; }
       .status-dot-online { color: #22c55e; }
       .status-dot-offline { color: #ef4444; }
@@ -620,13 +697,17 @@
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-mark">AX</div>
+          <div class="brand-mark">AX3</div>
           <div class="brand-copy">
-            <h1>AtlasX Exchange</h1>
+            <h1>ATLASX3</h1>
             <p>Trading, payments, copy trading and on-chain ops.</p>
           </div>
         </div>
-        <nav>
+        <label class="nav-search" for="navSearchInput">
+          <span class="sr-only">Find an application tool</span>
+          <input id="navSearchInput" type="search" placeholder="Find a tool…" autocomplete="off" />
+        </label>
+        <nav aria-label="Application tools">
           <p class="nav-group-label">Trading</p>
           <button class="nav-link" data-section-target="marketsPanel">📈 Markets</button>
           <button class="nav-link" data-section-target="screenerPanel">🔍 Screener</button>
@@ -672,6 +753,7 @@
           <button class="nav-link" data-section-target="assistantPanel">🤖 Assistant</button>
           <button class="nav-link" data-section-target="settingsPanel">⚙️ Settings</button>
         </nav>
+        <p class="nav-empty" id="navSearchEmpty" hidden>No matching tools.</p>
       </aside>
 
       <main class="main">
@@ -729,7 +811,7 @@
               <form id="loginForm">
                 <label>
                   Email
-                  <input id="loginEmail" name="email" type="email" placeholder="trader@atlasx.dev" />
+                  <input id="loginEmail" name="email" type="email" placeholder="trader@atlasx3.dev" />
                 </label>
                 <label>
                   Password
@@ -744,7 +826,7 @@
                 <form id="registerForm">
                   <label>
                     Email
-                    <input name="email" type="email" placeholder="newuser@atlasx.dev" />
+                    <input name="email" type="email" placeholder="newuser@atlasx3.dev" />
                   </label>
                   <label>
                     Username
@@ -767,7 +849,7 @@
           </div>
         </section>
 
-        <div class="tab-row" style="margin: 10px 0 14px; gap: 4px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; scrollbar-width: none;">
+        <div class="tab-row dashboard-tabs" aria-label="Workspace sections">
           <button class="dashboard-tab" data-section-target="marketsPanel">📈 Markets</button>
           <button class="dashboard-tab" data-section-target="screenerPanel">🔍 Screener</button>
           <button class="dashboard-tab" data-section-target="portfolioPanel">💰 Portfolio</button>
@@ -1592,6 +1674,42 @@
 
         <section class="dashboard-section" id="walletPanel">
           <div class="grid">
+            <div class="panel span-12">
+              <h3>ATLASX3 TRX Receiving Wallet</h3>
+              <p class="meta">
+                Send native TRX only on the network shown below. Transfers require manual verification and do not automatically credit your exchange balance.
+              </p>
+              <div class="field-grid">
+                <div class="summary-card">
+                  <span class="meta">Network</span>
+                  <strong id="tronDepositNetwork">Loading…</strong>
+                </div>
+                <div class="summary-card" style="grid-column: span 2;">
+                  <span class="meta">Receiving address</span>
+                  <code class="wallet-address" id="tronDepositAddress" aria-live="polite">Loading…</code>
+                </div>
+              </div>
+              <div class="button-row" style="margin-top: 12px;">
+                <button
+                  type="button"
+                  data-action="copy-address"
+                  data-copy-label="TRX receiving address"
+                  id="copyTronDepositAddress"
+                  disabled
+                >
+                  Copy address
+                </button>
+                <a
+                  class="pill"
+                  id="tronDepositExplorer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  hidden
+                >
+                  View on TRONSCAN
+                </a>
+              </div>
+            </div>
             <div class="panel span-4">
               <h3>Generate Wallet</h3>
               <form id="walletGenerateForm">
@@ -1653,7 +1771,8 @@
         <section class="dashboard-section" id="launchpadPanel">
           <div class="grid">
             <div class="panel span-5">
-              <h3>Create Token</h3>
+              <h3>Token Launch Planner</h3>
+              <p class="meta">Build a launch draft for review. On-chain deployment requires a configured audited token factory.</p>
               <div class="field-grid">
                 <label>
                   Token Name
@@ -1677,12 +1796,12 @@
                 </label>
               </div>
               <div class="button-row" style="margin-top: 12px;">
-                <button type="button" data-action="create-token">Deploy Token</button>
+                <button type="button" data-action="create-token">Create Draft</button>
               </div>
               <div class="assistant-log" id="launchResult" style="margin-top: 12px; min-height: 0;"></div>
             </div>
             <div class="table-card span-7">
-              <h3>Active Launches</h3>
+              <h3>Demo & Draft Launches</h3>
               <table>
                 <thead>
                   <tr>
@@ -2306,51 +2425,34 @@
 
         <section class="dashboard-section" id="hardhatPanel">
           <div class="grid">
-            <!-- Deploy Controls -->
             <div class="panel span-6">
-              <h3>🏗️ AtlasX Local Network</h3>
-              <p class="meta">Deploy and interact with the AtlasX DEX on Hardhat local node (port 8545).</p>
+              <h3>🏗️ ATLASX3 Contract Workspace</h3>
+              <p class="meta">Compile, deploy, and inspect the local asset registry on the configured Hardhat node.</p>
+              <div id="hardhatStatus" class="status-chip" aria-live="polite">Sign in to check workspace</div>
               <div class="button-row" style="margin-bottom:12px;">
-                <button type="button" data-action="hardhat-deploy-all">🚀 Deploy All Contracts</button>
-                <button type="button" class="secondary" data-action="hardhat-check-node">📡 Check Node</button>
+              <button type="button" id="hardhatCompileBtn" class="secondary" data-action="hardhat-compile">Compile</button>
+              <button type="button" id="hardhatDeployBtn" data-action="hardhat-deploy-all" disabled>Deploy Registry</button>
+              <button type="button" class="secondary" data-action="hardhat-check-node">📡 Check Node</button>
               </div>
               <div class="assistant-log" id="hardhatDeployLog" style="min-height:60px;"></div>
-
-              <h4 style="margin-top:16px;">Mint ATX Token</h4>
-              <div class="field-grid">
-                <label>Recipient <input id="atxMintTo" type="text" placeholder="0x..." /></label>
-                <label>Amount <input id="atxMintAmount" type="number" value="1000" /></label>
-              </div>
-              <button type="button" data-action="hardhat-mint-atx" style="margin-top:8px;">Mint ATX</button>
-              <div class="assistant-log" id="hardhatMintLog" style="margin-top:8px; min-height:0;"></div>
             </div>
 
-            <!-- DEX Operations -->
             <div class="panel span-6">
-              <h3>💱 DEX Operations</h3>
-
-              <h4>Create Pair</h4>
+              <h3>Register Asset</h3>
+              <p class="meta">Write validated asset metadata to the deployed local registry.</p>
+              <form id="hardhatAssetForm">
               <div class="field-grid">
-                <label>Token A <input id="dexTokenA" type="text" placeholder="0x..." /></label>
-                <label>Token B <input id="dexTokenB" type="text" placeholder="0x..." /></label>
+                <label>Symbol <input name="symbol" type="text" maxlength="12" placeholder="ATX" required /></label>
+                <label>Name <input name="name" type="text" maxlength="80" placeholder="AtlasX Token" required /></label>
+                <label style="grid-column: 1 / -1;">Metadata URI <input name="metadataUri" type="url" placeholder="https://… or ipfs://…" /></label>
               </div>
-              <button type="button" data-action="hardhat-create-pair" style="margin-top:8px;">Create Pair</button>
-
-              <h4 style="margin-top:16px;">Add Liquidity</h4>
-              <div class="field-grid">
-                <label>Token A <input id="liqTokenA" type="text" placeholder="0x..." /></label>
-                <label>Token B <input id="liqTokenB" type="text" placeholder="0x..." /></label>
-                <label>Amount A <input id="liqAmountA" type="number" value="1000" /></label>
-                <label>Amount B <input id="liqAmountB" type="number" value="1000" /></label>
-              </div>
-              <button type="button" data-action="hardhat-add-liquidity" style="margin-top:8px;">Add Liquidity</button>
-              <div class="assistant-log" id="hardhatDexLog" style="margin-top:8px; min-height:0;"></div>
+              <button id="hardhatRegisterBtn" type="submit" disabled>Register Asset</button>
+              </form>
             </div>
 
-            <!-- Deployed Contracts Table -->
             <div class="table-card span-12">
               <div class="toolbar" style="justify-content:space-between; align-items:center;">
-                <h3>📋 Deployed Contracts</h3>
+                <h3>📋 Registry Resources</h3>
                 <button type="button" data-action="hardhat-refresh-contracts">🔄 Refresh</button>
               </div>
               <table>
@@ -2367,7 +2469,6 @@
               </table>
             </div>
 
-            <!-- Hardhat Accounts -->
             <div class="table-card span-12">
               <div class="toolbar" style="justify-content:space-between; align-items:center;">
                 <h3>👛 Test Accounts</h3>
@@ -2381,13 +2482,12 @@
               </table>
             </div>
           </div>
-          <form id="hardhatAssetForm" hidden></form>
         </section>
 
         <section class="dashboard-section" id="assistantPanel">
           <div class="grid">
             <div class="panel span-5">
-              <h3>AtlasX Assistant</h3>
+              <h3>ATLASX3 Assistant</h3>
               <form id="assistantForm">
                 <label>
                   Ask the desk
@@ -2445,7 +2545,8 @@
         <section class="dashboard-section" id="bridgePanel">
           <div class="grid">
             <div class="panel span-6">
-              <h3>Cross-chain Bridge</h3>
+              <h3>Cross-chain Bridge Planner</h3>
+              <p class="meta">Estimate a transfer route before signing with a supported external bridge wallet. ATLASX3 does not fabricate or submit bridge transactions.</p>
               <div class="field-grid">
                 <label>
                   From Network
@@ -2488,17 +2589,16 @@
                 </label>
               </div>
               <div class="button-row" style="margin-top: 12px;">
-                <button type="button" class="secondary" data-action="bridge-estimate">Estimate Fee</button>
-                <button type="button" data-action="bridge-initiate">Initiate Bridge</button>
+                <button type="button" data-action="bridge-estimate">Create Transfer Plan</button>
               </div>
               <div class="assistant-log" id="bridgeFeeResult" style="margin-top: 12px; min-height: 0;"></div>
             </div>
             <div class="table-card span-6">
-              <h3>Bridge History</h3>
+              <h3>Transfer Plans</h3>
               <table>
                 <thead>
                   <tr>
-                    <th>TxHash</th>
+                    <th>Reference</th>
                     <th>From</th>
                     <th>To</th>
                     <th>Token</th>
@@ -3424,6 +3524,7 @@
       <div class="shortcut-row" style="border-bottom: 0;"><span>Focus search</span><span class="shortcut-key">/</span></div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

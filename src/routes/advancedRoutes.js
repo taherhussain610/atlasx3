@@ -165,27 +165,33 @@ module.exports = function createAdvancedRoutes(app, {
    */
   app.post("/api/indicators/stochastic", auth, (req, res) => {
     try {
-      const { prices, period = 14, smoothK = 3, smoothD = 3 } = req.body;
-      if (!prices || !Array.isArray(prices) || prices.length === 0) {
-        return res.status(400).json({ error: "Prices array is required and must not be empty" });
+      const { highs, lows, closes, period = 14, smoothK = 3, smoothD = 3 } = req.body;
+      if (
+        !Array.isArray(highs) ||
+        !Array.isArray(lows) ||
+        !Array.isArray(closes) ||
+        closes.length < period ||
+        highs.length !== closes.length ||
+        lows.length !== closes.length
+      ) {
+        return res.status(400).json({
+          error: "Equal-length highs, lows, and closes arrays with enough data are required",
+        });
       }
 
-      const stochastic = TechnicalIndicators.calculateStochastic(
-        prices,
-        period,
-        smoothK,
-        smoothD
-      );
+      const rawK = TechnicalIndicators.calculateStochastic(highs, lows, closes, period);
+      const k = smoothK > 1 ? TechnicalIndicators.calculateSMA(rawK, smoothK) : rawK;
+      const d = smoothD > 1 ? TechnicalIndicators.calculateSMA(k, smoothD) : k;
       res.json({
         indicator: "STOCHASTIC",
         period,
         smoothK,
         smoothD,
-        k: stochastic.k,
-        d: stochastic.d,
-        overbought: stochastic.k && stochastic.k[stochastic.k.length - 1] > 80,
-        oversold: stochastic.k && stochastic.k[stochastic.k.length - 1] < 20,
-        dataPoints: stochastic.k ? stochastic.k.length : 0,
+        k,
+        d,
+        overbought: k.length > 0 && k[k.length - 1] > 80,
+        oversold: k.length > 0 && k[k.length - 1] < 20,
+        dataPoints: k.length,
       });
     } catch (error) {
       console.error("Stochastic Oscillator calculation error:", error);
@@ -237,11 +243,26 @@ module.exports = function createAdvancedRoutes(app, {
         rsi: TechnicalIndicators.calculateRSI(prices, periods.rsi || 14),
         macd: TechnicalIndicators.calculateMACD(prices),
         bollinger: TechnicalIndicators.calculateBollingerBands(prices),
-        stochastic: TechnicalIndicators.calculateStochastic(prices),
       };
 
-      // Add ATR if high/low/close data available
-      if (highs && lows && closes) {
+      if (
+        Array.isArray(highs) &&
+        Array.isArray(lows) &&
+        Array.isArray(closes) &&
+        highs.length === closes.length &&
+        lows.length === closes.length
+      ) {
+        const rawK = TechnicalIndicators.calculateStochastic(
+          highs,
+          lows,
+          closes,
+          periods.stochastic || 14
+        );
+        const k = TechnicalIndicators.calculateSMA(rawK, periods.smoothK || 3);
+        indicators.stochastic = {
+          k,
+          d: TechnicalIndicators.calculateSMA(k, periods.smoothD || 3),
+        };
         indicators.atr = TechnicalIndicators.calculateATR(highs, lows, closes);
       }
 

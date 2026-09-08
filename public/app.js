@@ -111,7 +111,6 @@ const state = {
 
 let toastTimer = null;
 
-const wsOrigin = window.location.origin;
 const apiBase = "";
 const MARKET_SYMBOLS = {
   bitcoin: "BTC",
@@ -206,7 +205,9 @@ async function apiCall(url, options = {}) {
     if (response.status === 401 && !skipAuthRedirect) {
       logout();
     }
-    throw new Error(payload.error || payload.message || `Request failed: ${response.status}`);
+    const error = new Error(payload.error || payload.message || `Request failed: ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   setConnectionStatus(key ? `ok ${key}` : "ready", "positive");
@@ -236,6 +237,25 @@ function showToast(message, tone = "positive") {
   setConnectionStatus(message, tone);
 }
 
+async function copyAddress(address, label = "Address") {
+  const value = String(address || "").trim();
+  if (!value) {
+    showToast(`${label} is unavailable`, "warning");
+    return;
+  }
+  if (!navigator.clipboard?.writeText) {
+    showToast("Clipboard access is unavailable", "warning");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast(`${label} copied`, "positive");
+  } catch {
+    showToast(`Unable to copy ${label.toLowerCase()}`, "negative");
+  }
+}
+
 function syncFollowingState(following = []) {
   const normalized = Array.isArray(following) ? following : [];
   state.following = normalized;
@@ -246,6 +266,7 @@ function updateStoredToken(token) {
   state.token = token;
   localStorage.setItem("token", state.token);
   localStorage.setItem("atlasx_token", state.token);
+  connectWebSocket();
 }
 
 function setUser(user) {
@@ -255,6 +276,8 @@ function setUser(user) {
 }
 
 function logout() {
+  state.websocket?.disconnect?.();
+  state.websocket = null;
   state.token = null;
   state.user = null;
   localStorage.removeItem("token");
@@ -263,17 +286,111 @@ function logout() {
   renderAccountSnapshot();
 }
 
+function filterNavigation(query = "") {
+  const navigation = document.querySelector(".sidebar nav");
+  const emptyState = document.getElementById("navSearchEmpty");
+  if (!navigation) {
+    return;
+  }
+
+  const normalizedQuery = String(query).trim().toLowerCase();
+  const links = [...navigation.querySelectorAll(".nav-link")];
+  let visibleCount = 0;
+  links.forEach((link) => {
+    const matches = !normalizedQuery || link.textContent.toLowerCase().includes(normalizedQuery);
+    link.hidden = !matches;
+    visibleCount += matches ? 1 : 0;
+  });
+
+  [...navigation.querySelectorAll(".nav-group-label")].forEach((label) => {
+    let sibling = label.nextElementSibling;
+    let hasVisibleLink = false;
+    while (sibling && !sibling.classList.contains("nav-group-label")) {
+      if (sibling.classList.contains("nav-link") && !sibling.hidden) {
+        hasVisibleLink = true;
+        break;
+      }
+      sibling = sibling.nextElementSibling;
+    }
+    label.hidden = !hasVisibleLink;
+  });
+
+  if (emptyState) {
+    emptyState.hidden = visibleCount !== 0;
+  }
+}
+
+function handleSectionTabKeydown(event) {
+  const currentTab = event.target.closest(".dashboard-tab");
+  if (!currentTab) {
+    return;
+  }
+
+  const tabs = [...document.querySelectorAll(".dashboard-tab")];
+  const currentIndex = tabs.indexOf(currentTab);
+  const keyTargets = {
+    ArrowLeft: (currentIndex - 1 + tabs.length) % tabs.length,
+    ArrowRight: (currentIndex + 1) % tabs.length,
+    Home: 0,
+    End: tabs.length - 1,
+  };
+  if (!(event.key in keyTargets)) {
+    return;
+  }
+
+  event.preventDefault();
+  const nextTab = tabs[keyTargets[event.key]];
+  switchSection(nextTab.dataset.sectionTarget);
+  nextTab.focus();
+}
+
+function initializeSectionNavigation() {
+  const tabList = document.querySelector(".dashboard-tabs");
+  const tabs = [...document.querySelectorAll(".dashboard-tab")];
+  tabList?.setAttribute("role", "tablist");
+  tabList?.addEventListener("keydown", handleSectionTabKeydown);
+
+  tabs.forEach((tab, index) => {
+    const panelId = tab.dataset.sectionTarget;
+    tab.id ||= `workspaceTab${index + 1}`;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", panelId);
+    document.getElementById(panelId)?.setAttribute("aria-labelledby", tab.id);
+  });
+  document.querySelectorAll(".dashboard-section").forEach((section) => {
+    section.setAttribute("role", "tabpanel");
+  });
+
+  const searchInput = document.getElementById("navSearchInput");
+  searchInput?.addEventListener("input", () => filterNavigation(searchInput.value));
+  filterNavigation();
+  switchSection(state.activeSection);
+}
+
 function switchSection(sectionId) {
   state.activeSection = sectionId;
   const dashboardTabs = document.querySelectorAll(".dashboard-tab");
+  const activeDashboardTab = [...dashboardTabs].find(
+    (tab) => tab.dataset.sectionTarget === sectionId
+  );
   document.querySelectorAll(".dashboard-section").forEach((section) => {
     section.classList.toggle("active", section.id === sectionId);
   });
   document.querySelectorAll(".nav-link, .dashboard-tab").forEach((button) => {
-    button.classList.toggle("active", button.dataset.sectionTarget === sectionId);
+    const isActive = button.dataset.sectionTarget === sectionId;
+    button.classList.toggle("active", isActive);
+    if (button.classList.contains("nav-link")) {
+      if (isActive) {
+        button.setAttribute("aria-current", "page");
+      } else {
+        button.removeAttribute("aria-current");
+      }
+    }
   });
   dashboardTabs.forEach((tab) => {
-    tab.setAttribute("aria-selected", String(tab.dataset.sectionTarget === sectionId));
+    const isActive = tab.dataset.sectionTarget === sectionId;
+    tab.setAttribute("aria-selected", String(isActive));
+    tab.tabIndex = isActive || (!activeDashboardTab && tab === dashboardTabs[0]) ? 0 : -1;
   });
 
   if (sectionId === "paymentPanel") {
@@ -291,6 +408,10 @@ function switchSection(sectionId) {
   if (sectionId === "advancedToolsPanel" && !state.advToolsLoaded) {
     state.advToolsLoaded = true;
     refreshAdvMonitoring().catch(() => null);
+  }
+
+  if (sectionId === "hardhatPanel") {
+    refreshHardhatWorkspace();
   }
 }
 
@@ -323,31 +444,53 @@ function renderAccountSnapshot() {
 }
 
 function connectWebSocket() {
-  if (!("WebSocket" in window)) {
+  state.websocket?.disconnect?.();
+  state.websocket = null;
+
+  if (!state.token) {
+    setWsStatus("signed out");
+    return;
+  }
+  if (typeof window.io !== "function") {
     setWsStatus("unsupported");
     return;
   }
 
-  const protocol = wsOrigin.startsWith("https") ? "wss" : "ws";
-  const socketUrl = `${protocol}://${window.location.host}`;
-
   try {
-    state.websocket = new WebSocket(socketUrl);
+    const socket = window.io({
+      auth: { token: state.token },
+      transports: ["websocket", "polling"],
+    });
+    state.websocket = socket;
     setWsStatus("connecting");
-    state.websocket.addEventListener("open", () => setWsStatus("connected"));
-    state.websocket.addEventListener("close", () => setWsStatus("closed"));
-    state.websocket.addEventListener("error", () => setWsStatus("error"));
-    state.websocket.addEventListener("message", (event) => {
+    socket.on("connect", () => {
+      setWsStatus("connected");
+      socket.emit("subscribe", { channel: "market" });
+    });
+    socket.on("disconnect", () => setWsStatus("disconnected"));
+    socket.on("connect_error", () => setWsStatus("authentication failed"));
+
+    const appendEvent = (eventName, payload = {}) => {
       const feed = document.getElementById("marketFeed");
-      const parsed = safeJsonParse(event.data, { event: "update", message: event.data });
       if (feed) {
         const item = document.createElement("article");
         item.innerHTML = `
-          <strong>${escapeHtml(parsed.event || "update")}</strong>
-          <p class="meta">${escapeHtml(parsed.message || JSON.stringify(parsed))}</p>
+          <strong>${escapeHtml(eventName)}</strong>
+          <p class="meta">${escapeHtml(payload.message || JSON.stringify(payload))}</p>
         `;
         feed.prepend(item);
       }
+    };
+    [
+      "priceUpdate",
+      "marketUpdate",
+      "balanceUpdate",
+      "transaction",
+      "orderUpdate",
+      "notification",
+      "ANALYTICS_UPDATE",
+    ].forEach((eventName) => {
+      socket.on(eventName, (payload) => appendEvent(eventName, payload));
     });
   } catch {
     setWsStatus("unavailable");
@@ -414,13 +557,18 @@ async function hydrateSession() {
   updateStoredToken(state.token);
 
   try {
-    const me = await apiCall("/api/auth/me", {
+    const me = await apiCall("/api/me", {
       key: "auth-session",
       skipAuthRedirect: true,
     });
     setUser(me.user || me);
-  } catch {
-    setUser({ id: 1, email: "session@atlasx.dev", username: "Session Trader" });
+  } catch (error) {
+    if (error.status === 401 || error.status === 403) {
+      logout();
+    } else {
+      setConnectionStatus("session verification unavailable", "warning");
+    }
+    return;
   }
 
   await refreshDashboard();
@@ -723,7 +871,7 @@ function renderComparePrices() {
 function compareExchangePrices() {
   const symbol = String(document.getElementById("compareSymbol")?.value || "BTC").trim().toUpperCase() || "BTC";
   const basePrice = getMarketSnapshot(symbol).price || 100;
-  const exchanges = ["AtlasX", "CoinHub", "Vertex", "Bluefin", "KrakenX"];
+  const exchanges = ["ATLASX3", "CoinHub", "Vertex", "Bluefin", "KrakenX"];
   state.compareRows = exchanges.map((exchange, index) => {
     const bid = basePrice - index * Math.max(basePrice * 0.0008, 0.01);
     const ask = basePrice + index * Math.max(basePrice * 0.0009, 0.01) + Math.max(basePrice * 0.0005, 0.01);
@@ -1028,7 +1176,7 @@ function exportJournalCsv() {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `atlasx-journal-${Date.now()}.csv`;
+  link.download = `atlasx3-journal-${Date.now()}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -1126,6 +1274,14 @@ function getPgMethodLabel(method = "card") {
 }
 
 function normalizePaymentRecord(record = {}) {
+  const parsedMetadata =
+    typeof record.metadata === "string"
+      ? safeJsonParse(record.metadata, {})
+      : record.metadata || {};
+  const metadata =
+    parsedMetadata && typeof parsedMetadata === "object" && !Array.isArray(parsedMetadata)
+      ? parsedMetadata
+      : {};
   return {
     id: String(record.id || `PAY_${Date.now()}`),
     method: String(record.method || (record.cryptoSymbol ? "crypto" : "card")),
@@ -1135,9 +1291,11 @@ function normalizePaymentRecord(record = {}) {
     created_at: record.created_at || record.createdAt || new Date().toISOString(),
     instructions: record.instructions || "",
     qr_data: record.qr_data || record.qrData || "",
-    cryptoAmount: record.cryptoAmount || "",
-    cryptoSymbol: record.cryptoSymbol || "",
-    address: record.address || "",
+    cryptoAmount: record.cryptoAmount || metadata.cryptoAmount || "",
+    cryptoSymbol: record.cryptoSymbol || metadata.cryptoSymbol || "",
+    address: record.address || metadata.address || "",
+    network: record.network || metadata.network || "",
+    autoCredit: (record.autoCredit ?? metadata.autoCredit) === true,
   };
 }
 
@@ -1276,6 +1434,7 @@ function renderPgSummary(payment = null) {
   const summaryLines = [
     `${formatPlainNumber(normalized.amount, 2)} ${normalized.currency}`,
     normalized.status,
+    normalized.network ? `${normalized.network.toUpperCase()} network` : "",
     normalized.instructions ||
       (normalized.cryptoAmount && normalized.cryptoSymbol
         ? `${normalized.cryptoAmount} ${normalized.cryptoSymbol}`
@@ -1283,11 +1442,27 @@ function renderPgSummary(payment = null) {
   ].filter(Boolean);
 
   if (qrDisplay) {
+    const receivingAddress = normalized.address
+      ? `
+        <strong>Receiving address</strong>
+        <code class="wallet-address">${escapeHtml(normalized.address)}</code>
+        <button
+          type="button"
+          class="secondary"
+          data-action="copy-address"
+          data-address="${escapeHtml(normalized.address)}"
+          data-copy-label="${escapeHtml(`${normalized.cryptoSymbol || "Crypto"} receiving address`)}"
+        >
+          Copy address
+        </button>
+      `
+      : "";
     qrDisplay.innerHTML = normalized.qr_data
       ? `
         <div class="pg-qr-box">
           <div style="font-size: 48px;">${escapeHtml(normalized.method === "crypto" ? "₿" : "💳")}</div>
           <div>${escapeHtml(normalized.qr_data)}</div>
+          ${receivingAddress}
         </div>
       `
       : `
@@ -1299,12 +1474,62 @@ function renderPgSummary(payment = null) {
   }
 
   if (instructions) {
+    const manualSettlementNotice =
+      normalized.cryptoSymbol === "TRX" && !normalized.autoCredit
+        ? '<p class="meta">TRX transfers require manual verification and do not automatically credit your exchange balance.</p>'
+        : "";
     instructions.innerHTML = `
       <article>
         <strong>${escapeHtml(normalized.id)}</strong>
         <p class="meta">${escapeHtml(summaryLines.join(" · "))}</p>
+        ${manualSettlementNotice}
       </article>
     `;
+  }
+}
+
+async function loadTronDepositWallet() {
+  const addressNode = document.getElementById("tronDepositAddress");
+  const networkNode = document.getElementById("tronDepositNetwork");
+  const copyButton = document.getElementById("copyTronDepositAddress");
+  const explorerLink = document.getElementById("tronDepositExplorer");
+
+  try {
+    const wallet = await apiCall("/api/tron/deposit-wallet", {
+      key: "tron-deposit-wallet",
+      skipAuthRedirect: true,
+    });
+    const address = wallet.configured ? String(wallet.address || "") : "";
+
+    if (addressNode) {
+      addressNode.textContent = address || "Not configured";
+    }
+    if (networkNode) {
+      networkNode.textContent = String(wallet.network || "unknown").toUpperCase();
+    }
+    if (copyButton) {
+      copyButton.dataset.address = address;
+      copyButton.disabled = !address;
+    }
+    if (explorerLink) {
+      explorerLink.hidden = !address || !wallet.explorerUrl;
+      if (!explorerLink.hidden) {
+        explorerLink.href = wallet.explorerUrl;
+      }
+    }
+  } catch {
+    if (addressNode) {
+      addressNode.textContent = "Unavailable";
+    }
+    if (networkNode) {
+      networkNode.textContent = "Unavailable";
+    }
+    if (copyButton) {
+      copyButton.disabled = true;
+    }
+    if (explorerLink) {
+      explorerLink.hidden = true;
+    }
   }
 }
 
@@ -1317,7 +1542,9 @@ function renderPaymentHistory() {
   body.innerHTML = state.pgPayments.length
     ? state.pgPayments
         .map((row) => {
-          const confirmDisabled = ["completed", "partially_refunded", "refunded"].includes(row.status);
+          const confirmDisabled =
+            row.method === "crypto" ||
+            ["completed", "partially_refunded", "refunded"].includes(row.status);
           const refundDisabled = !["completed", "partially_refunded"].includes(row.status);
           return `
             <tr>
@@ -1905,7 +2132,7 @@ function renderBridgeHistory() {
   }
 
   if (!state.bridgeHistory.length) {
-    body.innerHTML = '<tr><td colspan="6" class="empty">No bridge transfers yet.</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" class="empty">No transfer plans yet.</td></tr>';
     return;
   }
 
@@ -1913,7 +2140,7 @@ function renderBridgeHistory() {
     .map(
       (item) => `
         <tr>
-          <td>${escapeHtml(item.txHash)}</td>
+          <td>${escapeHtml(item.reference)}</td>
           <td>${escapeHtml(item.from)}</td>
           <td>${escapeHtml(item.to)}</td>
           <td>${escapeHtml(item.token)}</td>
@@ -2631,24 +2858,14 @@ async function createTokenLaunch() {
     return;
   }
 
-  const payload = { name, symbol, supply, decimals, description };
-  const result = await apiCall("/api/erc1155/mint", {
-    key: "launchpad-create-token",
-    method: "POST",
-    body: payload,
-    skipAuthRedirect: true,
-  }).catch(() => ({
-    status: "mock-deployed",
-    txHash: `0xLAUNCH${Date.now().toString(16).toUpperCase()}`,
-  }));
-
+  const draftId = `DRAFT-${Date.now().toString(36).toUpperCase()}`;
   state.launchpadLaunches.unshift({
-    id: `launch_${Date.now()}`,
+    id: draftId,
     token: name,
     symbol,
     supply,
-    status: "Live",
-    raised: Math.round(supply * 0.08),
+    status: "Draft",
+    raised: 0,
     goal: Math.round(supply * 0.2),
   });
   state.launchpadLaunches = state.launchpadLaunches.slice(0, 10);
@@ -2657,8 +2874,8 @@ async function createTokenLaunch() {
   if (resultNode) {
     resultNode.innerHTML = `
       <article>
-        <strong>${escapeHtml(`${name} deployed`)}</strong>
-        <p class="meta">${escapeHtml(`Symbol ${symbol} · ${formatPlainNumber(supply, 0)} supply · ${result.txHash || result.status || "submitted"}`)}</p>
+        <strong>${escapeHtml(`${name} launch draft created`)}</strong>
+        <p class="meta">${escapeHtml(`${draftId} · ${symbol} · ${formatPlainNumber(supply, 0)} supply · ${decimals} decimals${description ? ` · ${description}` : ""}. No blockchain transaction was submitted.`)}</p>
       </article>
     `;
   }
@@ -3053,7 +3270,7 @@ function renderDexTokens() {
           <td>${escapeHtml(token.symbol || "N/A")}</td>
           <td>${escapeHtml(token.name || "N/A")}</td>
           <td>${escapeHtml(token.address || token.contractAddress || token.assetAddress || "N/A")}</td>
-          <td>${escapeHtml(token.chain || token.network || "AtlasX")}</td>
+          <td>${escapeHtml(token.chain || token.network || "ATLASX3")}</td>
         </tr>
       `
     )
@@ -3545,7 +3762,12 @@ function renderPredictionLeaderboard() {
   }
 
   if (!state.dashboard.predictionLeaderboard.length) {
-    body.innerHTML = '<tr><td colspan="4" class="empty">Leaderboard loads after authentication.</td></tr>';
+    body.innerHTML = `
+      <tr>
+        <td colspan="3" class="empty">No ranked predictions yet.</td>
+        <td><button type="button" class="secondary" data-action="place-prediction">Place first signal</button></td>
+      </tr>
+    `;
     return;
   }
 
@@ -3574,9 +3796,13 @@ function normalizeHardhatContracts(payload) {
         typeof value === "string" ? { contractName, address: value } : { contractName, ...value }
       )
     );
-  } else if (payload?.deployment?.address) {
-    rawContracts.push(payload.deployment);
-  } else if (Array.isArray(payload?.assets)) {
+  } else if (Array.isArray(payload)) {
+    rawContracts.push(...payload);
+  } else {
+    if (payload?.deployment?.address) {
+      rawContracts.push(payload.deployment);
+    }
+    if (Array.isArray(payload?.assets)) {
     rawContracts.push(
       ...payload.assets.map((asset) => ({
         contractName: asset.name || asset.symbol || "Registry Asset",
@@ -3586,8 +3812,7 @@ function normalizeHardhatContracts(payload) {
         actionLabel: asset.symbol || "Ready",
       }))
     );
-  } else if (Array.isArray(payload)) {
-    rawContracts.push(...payload);
+    }
   }
 
   return rawContracts
@@ -3608,7 +3833,7 @@ function renderHardhatAssets() {
   }
 
   if (!state.dashboard.hardhatAssets.length) {
-    body.innerHTML = '<tr><td colspan="5" class="empty">Deploy AtlasX contracts to load local DEX addresses.</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="empty">Deploy the local registry to load contract and asset metadata.</td></tr>';
     return;
   }
 
@@ -3643,8 +3868,8 @@ function renderHardhatAccounts() {
       (account, index) => `
         <tr>
           <td>${escapeHtml(index + 1)}</td>
-          <td>${escapeHtml(account.address || account.account || "N/A")}</td>
-          <td>${escapeHtml(account.balance ?? account.eth ?? account.formattedBalance ?? "0")}</td>
+          <td>${escapeHtml(typeof account === "string" ? account : account.address || account.account || "N/A")}</td>
+          <td>${escapeHtml(typeof account === "string" ? "—" : account.balance ?? account.eth ?? account.formattedBalance ?? "0")}</td>
         </tr>
       `
     )
@@ -3662,7 +3887,7 @@ function appendAssistantMessage(role, message) {
     .map(
       (item) => `
         <article>
-          <strong>${item.role === "user" ? "You" : "AtlasX"}</strong>
+          <strong>${item.role === "user" ? "You" : "ATLASX3"}</strong>
           <p class="meta">${escapeHtml(item.message)}</p>
         </article>
       `
@@ -3739,9 +3964,7 @@ async function loadPredictionPositions() {
     });
     state.dashboard.predictionPositions = result.positions || result.data || result;
   } catch {
-    state.dashboard.predictionPositions = [
-      { marketId: "btc-weekly", marketName: "BTC Weekly Close", prediction: "above", amount: 150, status: "open" },
-    ];
+    state.dashboard.predictionPositions = [];
   }
 
   renderPredictionPositions();
@@ -3754,9 +3977,7 @@ async function loadPredictionLeaderboard() {
     });
     state.dashboard.predictionLeaderboard = result.leaderboard || result.data || result;
   } catch {
-    state.dashboard.predictionLeaderboard = [
-      { userId: 7, displayName: "Macro Atlas", pnl: 2840, hitRate: 71, marketId: "btc-weekly" },
-    ];
+    state.dashboard.predictionLeaderboard = [];
   }
 
   renderPredictionLeaderboard();
@@ -3780,7 +4001,8 @@ async function loadHardhatAccounts() {
     const result = await apiCall("/api/hardhat/accounts", {
       key: "hardhat-accounts",
     });
-    state.dashboard.hardhatAccounts = result.accounts || result.data || result || [];
+    state.dashboard.hardhatAccounts =
+      result.accountDetails || result.accounts || result.data || result || [];
   } catch {
     state.dashboard.hardhatAccounts = [];
   }
@@ -3951,7 +4173,7 @@ async function loadDexTokens() {
     state.dashboard.dexTokens = normalizeList(result, ["tokens"]);
   } catch {
     state.dashboard.dexTokens = [
-      { symbol: "ATX", name: "AtlasX Token", address: "N/A", chain: "AtlasX" },
+      { symbol: "ATX", name: "ATLASX3 Token", address: "N/A", chain: "ATLASX3" },
     ];
   }
 
@@ -4126,7 +4348,7 @@ async function closeMarginPosition(positionId, price) {
   return apiCall(`/api/margin/position/${encodeURIComponent(positionId)}/close`, {
     key: "margin-close",
     method: "POST",
-    body: { price: Number(price) },
+    body: { closePrice: Number(price) },
   });
 }
 
@@ -4261,53 +4483,6 @@ function closeFuturesPosition(positionId) {
   showToast("Futures position closed");
 }
 
-async function initiateBridgeTransfer() {
-  const from = String(document.getElementById("bridgeFromNet")?.value || "Ethereum");
-  const to = String(document.getElementById("bridgeToNet")?.value || "BSC");
-  const token = String(document.getElementById("bridgeToken")?.value || "ETH");
-  const amount = Number(document.getElementById("bridgeAmount")?.value || 0);
-  const recipient = String(document.getElementById("bridgeRecipient")?.value || "").trim();
-  const resultNode = document.getElementById("bridgeFeeResult");
-
-  if (!amount || amount <= 0 || !recipient) {
-    if (resultNode) {
-      resultNode.innerHTML = '<article><strong>Bridge request</strong><p class="meta">Enter a recipient and positive amount.</p></article>';
-    }
-    return;
-  }
-
-  const payload = { fromNetwork: from, toNetwork: to, token, amount, recipient };
-  const result = await apiCall("/api/crypto/bridge", {
-    key: "bridge-initiate",
-    method: "POST",
-    body: payload,
-    skipAuthRedirect: true,
-  }).catch(() => ({
-    txHash: `0xBRIDGE${Date.now().toString(16).toUpperCase()}`,
-    status: "pending",
-    mock: true,
-  }));
-
-  const txHash = result.txHash || result.hash || `0xBRIDGE${Date.now().toString(16).toUpperCase()}`;
-  state.bridgeHistory.unshift({
-    txHash,
-    from,
-    to,
-    token,
-    amount: formatPlainNumber(amount, 4),
-    status: result.status || "pending",
-  });
-  renderBridgeHistory();
-  if (resultNode) {
-    resultNode.innerHTML = `
-      <article>
-        <strong>Bridge initiated</strong>
-        <p class="meta">${escapeHtml(`${txHash} → ${token} ${formatPlainNumber(amount, 4)} to ${recipient}`)}</p>
-      </article>
-    `;
-  }
-}
-
 async function verifyEmail() {
   return apiCall("/api/email/verify", {
     key: "email-verify",
@@ -4320,9 +4495,9 @@ async function sendEmailTest() {
     key: "email-test",
     method: "POST",
     body: {
-      to: state.user?.email || "trader@atlasx.dev",
-      subject: "AtlasX SMTP test",
-      text: "Integration check from AtlasX dashboard.",
+      to: state.user?.email || "trader@atlasx3.dev",
+      subject: "ATLASX3 SMTP test",
+      text: "Integration check from the ATLASX3 dashboard.",
     },
   });
 }
@@ -4339,6 +4514,51 @@ async function getHardhatStatus() {
   });
 }
 
+function updateHardhatReadiness(status = null, error = "") {
+  const statusNode = document.getElementById("hardhatStatus");
+  const compileButton = document.getElementById("hardhatCompileBtn");
+  const deployButton = document.getElementById("hardhatDeployBtn");
+  const registerButton = document.getElementById("hardhatRegisterBtn");
+  const authenticated = Boolean(state.token);
+  const online = Boolean(status?.node?.online);
+  const deployed = Boolean(status?.deployment);
+
+  if (statusNode) {
+    statusNode.textContent = !authenticated
+      ? "Sign in to check workspace"
+      : error
+        ? "Unavailable"
+        : online
+          ? `Online · chain ${status.node.chainId || "unknown"} · block ${status.node.blockNumber ?? "—"}`
+          : "Offline";
+    statusNode.className = `status-chip ${online ? "positive" : error ? "negative" : "warning"}`;
+  }
+  if (compileButton) {
+    compileButton.disabled = !authenticated;
+  }
+  if (deployButton) {
+    deployButton.disabled = !authenticated || !online || !status?.compiler?.artifactAvailable;
+  }
+  if (registerButton) {
+    registerButton.disabled = !authenticated || !deployed;
+  }
+}
+
+async function refreshHardhatWorkspace() {
+  if (!state.token) {
+    updateHardhatReadiness();
+    return null;
+  }
+  try {
+    const status = await getHardhatStatus();
+    updateHardhatReadiness(status);
+    return status;
+  } catch (error) {
+    updateHardhatReadiness(null, error.message);
+    return null;
+  }
+}
+
 async function compileHardhat() {
   return apiCall("/api/hardhat/compile", {
     key: "hardhat-compile",
@@ -4350,30 +4570,6 @@ async function deployHardhat() {
   return apiCall("/api/hardhat/deploy", {
     key: "hardhat-deploy",
     method: "POST",
-  });
-}
-
-async function mintHardhatAtx(payload) {
-  return apiCall("/api/hardhat/mint", {
-    key: "hardhat-mint",
-    method: "POST",
-    body: payload,
-  });
-}
-
-async function createHardhatPair(payload) {
-  return apiCall("/api/hardhat/pair", {
-    key: "hardhat-pair",
-    method: "POST",
-    body: payload,
-  });
-}
-
-async function addHardhatLiquidity(payload) {
-  return apiCall("/api/hardhat/liquidity", {
-    key: "hardhat-liquidity",
-    method: "POST",
-    body: payload,
   });
 }
 
@@ -4416,7 +4612,7 @@ async function chatWithAssistant(message) {
 
 async function processTerminalPayment(formData) {
   if (!state.user) {
-    state.user = { id: 1, email: "trader@atlasx.dev", username: "Demo Trader" };
+    state.user = { id: 1, email: "trader@atlasx3.dev", username: "Demo Trader" };
   }
 
   const result = await apiCall("/api/payment-terminal/process", {
@@ -4500,7 +4696,8 @@ async function submitPaymentGateway() {
     return null;
   }
 
-  const amount = Number(document.getElementById("pgAmount")?.value || 0);
+  const amountInput = String(document.getElementById("pgAmount")?.value || "").trim();
+  const amount = Number(amountInput);
   const currency = String(document.getElementById("pgCurrency")?.value || "USD").toUpperCase();
   const method = state.pgMethod || "card";
 
@@ -4513,7 +4710,7 @@ async function submitPaymentGateway() {
   const payload =
     method === "crypto"
       ? {
-          amount,
+          amount: amountInput,
           currency,
           cryptoSymbol: String(document.getElementById("pgCryptoSymbol")?.value || "BTC").toUpperCase(),
         }
@@ -4657,7 +4854,7 @@ function exportPaymentHistoryCsv() {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `atlasx-payments-${Date.now()}.csv`;
+  link.download = `atlasx3-payments-${Date.now()}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -4742,8 +4939,14 @@ function bindFormHandlers() {
   marginCloseForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const formData = new FormData(marginCloseForm);
-    await closeMarginPosition(formData.get("positionId"), formData.get("price"));
-    await refreshDashboard();
+    try {
+      await closeMarginPosition(formData.get("positionId"), formData.get("price"));
+      marginCloseForm.reset();
+      showToast("Margin position closed", "positive");
+      await refreshDashboard();
+    } catch (error) {
+      showToast(error.message, "negative");
+    }
   });
 
   createP2POrderForm?.addEventListener("submit", async (event) => {
@@ -4776,12 +4979,16 @@ function bindFormHandlers() {
   hardhatAssetForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const payload = Object.fromEntries(new FormData(hardhatAssetForm).entries());
-    if (payload.chainId) {
-      payload.chainId = Number(payload.chainId);
+    try {
+      const result = await registerHardhatAsset(payload);
+      state.dashboard.hardhatAssets = normalizeHardhatContracts(result);
+      renderHardhatAssets();
+      hardhatAssetForm.reset();
+      updateHardhatStatusPanel(result, "Asset registered");
+      await refreshHardhatWorkspace();
+    } catch (error) {
+      updateHardhatStatusPanel({ error: error.message }, "Unable to register asset");
     }
-    const result = await registerHardhatAsset(payload);
-    updateHardhatStatusPanel(result, "Asset registered");
-    await refreshDashboard();
   });
 
   assistantForm?.addEventListener("submit", async (event) => {
@@ -4852,6 +5059,11 @@ function bindGlobalHandlers() {
 
     const action = target.dataset.action;
     if (!action) {
+      return;
+    }
+
+    if (action === "copy-address") {
+      await copyAddress(target.dataset.address, target.dataset.copyLabel || "Address");
       return;
     }
 
@@ -5083,26 +5295,32 @@ function bindGlobalHandlers() {
       const amount = Number(document.getElementById("bridgeAmount")?.value || 0);
       const recipient = String(document.getElementById("bridgeRecipient")?.value || "").trim();
       const resultNode = document.getElementById("bridgeFeeResult");
-      if (!amount || amount <= 0 || !recipient) {
+      if (!amount || amount <= 0 || !recipient || from === to) {
         if (resultNode) {
-          resultNode.innerHTML = '<article><strong>Bridge fee estimate</strong><p class="meta">Enter a recipient and positive amount.</p></article>';
+          resultNode.innerHTML = '<article><strong>Transfer plan</strong><p class="meta">Enter a recipient, a positive amount, and two different networks.</p></article>';
         }
         return;
       }
       const fee = estimateBridgeFee(amount, from, to);
+      const reference = `PLAN-${Date.now().toString(36).toUpperCase()}`;
+      state.bridgeHistory.unshift({
+        reference,
+        from,
+        to,
+        token,
+        amount: formatPlainNumber(amount, 4),
+        status: "Estimate only",
+      });
+      state.bridgeHistory = state.bridgeHistory.slice(0, 20);
+      renderBridgeHistory();
       if (resultNode) {
         resultNode.innerHTML = `
           <article>
-            <strong>${escapeHtml(`${token} bridge estimate`)}</strong>
-            <p class="meta">${escapeHtml(`Fee ${fee.total} (${fee.percentageFee} variable + ${fee.networkFee} network) from ${from} to ${to} for ${recipient}.`)}</p>
+            <strong>${escapeHtml(`${token} transfer plan ${reference}`)}</strong>
+            <p class="meta">${escapeHtml(`Estimated fee ${fee.total} (${fee.percentageFee} variable + ${fee.networkFee} network) from ${from} to ${to} for ${recipient}. Sign and submit with a supported external bridge wallet.`)}</p>
           </article>
         `;
       }
-      return;
-    }
-
-    if (action === "bridge-initiate") {
-      await initiateBridgeTransfer();
       return;
     }
 
@@ -5414,7 +5632,7 @@ function bindGlobalHandlers() {
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `atlasx-tax-${Date.now()}.csv`;
+      link.download = `atlasx3-tax-${Date.now()}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -5428,7 +5646,7 @@ function bindGlobalHandlers() {
     }
 
     if (action === "create-api-key") {
-      const name = String(document.getElementById("apiKeyName")?.value || "AtlasX Key").trim() || "AtlasX Key";
+      const name = String(document.getElementById("apiKeyName")?.value || "ATLASX3 Key").trim() || "ATLASX3 Key";
       const ipWhitelist = String(document.getElementById("apiKeyIp")?.value || "").trim();
       const permissions = [
         document.getElementById("permRead")?.checked ? "read" : "",
@@ -5669,60 +5887,37 @@ function bindGlobalHandlers() {
       return;
     }
 
+    if (action === "hardhat-compile") {
+      try {
+        const result = await compileHardhat();
+        updateHardhatLog("hardhatDeployLog", result, "Compilation result");
+      } catch (error) {
+        updateHardhatLog("hardhatDeployLog", { error: error.message }, "Compilation failed");
+      }
+      await refreshHardhatWorkspace();
+      return;
+    }
+
     if (action === "hardhat-deploy-all") {
-      const result = await deployHardhat().catch((error) => ({
-        error: `Unable to deploy AtlasX contracts right now. ${error.message}` ,
-      }));
-      updateHardhatLog("hardhatDeployLog", result, "Deployment result");
-      state.dashboard.hardhatAssets = normalizeHardhatContracts(result);
-      renderHardhatAssets();
-      await refreshDashboard();
+      try {
+        const result = await deployHardhat();
+        updateHardhatLog("hardhatDeployLog", result, "Deployment result");
+        state.dashboard.hardhatAssets = normalizeHardhatContracts(result);
+        renderHardhatAssets();
+      } catch (error) {
+        updateHardhatLog("hardhatDeployLog", { error: error.message }, "Deployment failed");
+      }
+      await refreshHardhatWorkspace();
       return;
     }
 
     if (action === "hardhat-check-node") {
-      const result = await getHardhatStatus().catch((error) => ({
-        error: `Unable to reach the Hardhat node. ${error.message}` ,
-      }));
-      updateHardhatLog("hardhatDeployLog", result, "Hardhat node status");
-      return;
-    }
-
-    if (action === "hardhat-mint-atx") {
-      const payload = {
-        to: String(document.getElementById("atxMintTo")?.value || "").trim(),
-        amount: String(document.getElementById("atxMintAmount")?.value || "").trim(),
-      };
-      const result = await mintHardhatAtx(payload).catch((error) => ({
-        error: `Unable to mint ATX right now. ${error.message}` ,
-      }));
-      updateHardhatLog("hardhatMintLog", result, "ATX mint result");
-      return;
-    }
-
-    if (action === "hardhat-create-pair") {
-      const payload = {
-        tokenA: String(document.getElementById("dexTokenA")?.value || "").trim(),
-        tokenB: String(document.getElementById("dexTokenB")?.value || "").trim(),
-      };
-      const result = await createHardhatPair(payload).catch((error) => ({
-        error: `Unable to create the pair right now. ${error.message}` ,
-      }));
-      updateHardhatLog("hardhatDexLog", result, "Pair creation result");
-      return;
-    }
-
-    if (action === "hardhat-add-liquidity") {
-      const payload = {
-        tokenA: String(document.getElementById("liqTokenA")?.value || "").trim(),
-        tokenB: String(document.getElementById("liqTokenB")?.value || "").trim(),
-        amountA: String(document.getElementById("liqAmountA")?.value || "").trim(),
-        amountB: String(document.getElementById("liqAmountB")?.value || "").trim(),
-      };
-      const result = await addHardhatLiquidity(payload).catch((error) => ({
-        error: `Unable to add liquidity right now. ${error.message}` ,
-      }));
-      updateHardhatLog("hardhatDexLog", result, "Liquidity result");
+      const result = await refreshHardhatWorkspace();
+      updateHardhatLog(
+        "hardhatDeployLog",
+        result || { error: "Hardhat node is unavailable" },
+        "Hardhat node status"
+      );
       return;
     }
 
@@ -5746,7 +5941,8 @@ function bindGlobalHandlers() {
       if (result.error) {
         updateHardhatLog("hardhatDeployLog", result, "Accounts request");
       } else {
-        state.dashboard.hardhatAccounts = result.accounts || result.data || result || [];
+        state.dashboard.hardhatAccounts =
+          result.accountDetails || result.accounts || result.data || result || [];
         renderHardhatAccounts();
       }
       return;
@@ -5922,22 +6118,39 @@ function bindGlobalHandlers() {
     }
 
     if (action === "place-prediction") {
-      const marketId = target.dataset.marketId || "btc-weekly";
-      const result = await apiCall("/api/prediction/predict", {
-        key: "prediction-place",
-        method: "POST",
-        body: {
-          marketId,
-          prediction: "above",
-          amount: 50,
-        },
-      }).catch((error) => ({ error: error.message }));
-      const body = document.getElementById("predictionPositionsBody");
-      if (body) {
-        body.insertAdjacentHTML(
-          "afterbegin",
-          `<tr><td>${escapeHtml(marketId)}</td><td>above</td><td>50</td><td>${escapeHtml(result.error ? "queued locally" : "submitted")}</td></tr>`
-        );
+      const prediction = window.prompt('Enter "yes" or "no" for a 50-unit stake:', "yes");
+      if (prediction === null) {
+        return;
+      }
+      const normalizedPrediction = prediction.trim().toLowerCase();
+      if (!["yes", "no"].includes(normalizedPrediction)) {
+        showToast('Prediction must be "yes" or "no"', "negative");
+        return;
+      }
+      try {
+        const marketResult = await apiCall("/api/prediction/markets", {
+          key: "prediction-markets",
+        });
+        const markets = normalizeList(marketResult, ["markets"]);
+        const requestedMarketId = String(target.dataset.marketId || "");
+        const market =
+          markets.find((entry) => entry.marketId === requestedMarketId) || markets[0];
+        if (!market) {
+          throw new Error("No active prediction market is available");
+        }
+        await apiCall("/api/prediction/predict", {
+          key: "prediction-place",
+          method: "POST",
+          body: {
+            marketId: market.marketId,
+            prediction: normalizedPrediction,
+            amount: 50,
+          },
+        });
+        await loadPredictionPositions();
+        showToast("Prediction submitted", "positive");
+      } catch (error) {
+        showToast(error.message, "negative");
       }
       return;
     }
@@ -5948,7 +6161,8 @@ async function bootstrap() {
   bindFormHandlers();
   bindGlobalHandlers();
   connectWebSocket();
-  appendAssistantMessage("assistant", "AtlasX assistant ready. Ask for risk summaries, on-chain status or desk workflows.");
+  appendAssistantMessage("assistant", "ATLASX3 assistant ready. Ask for risk summaries, on-chain status or desk workflows.");
+  await loadTronDepositWallet();
   await loadAssistantStatus().catch(() => null);
   await hydrateSession();
 }
@@ -5981,7 +6195,7 @@ document.addEventListener("DOMContentLoaded", () => {
   state.systemStatus = { services: [], timings: [] };
   state.settings = { currency: "USD" };
   state.leaderboardTab = "traders";
-  switchSection(state.activeSection);
+  initializeSectionNavigation();
   renderP2POrders();
   renderMyP2POrders();
   renderFollowingTraders();
@@ -6300,7 +6514,7 @@ async function calcAdvIndicator() {
       result = await apiCall("/api/indicators/stochastic", {
         key: "ind-stochastic",
         method: "POST",
-        body: { prices, period },
+        body: { highs, lows, closes, period },
       });
     } else if (type === "atr") {
       result = await apiCall("/api/indicators/atr", {

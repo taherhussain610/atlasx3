@@ -1,14 +1,14 @@
 #!/usr/bin/env pwsh
-# AtlasX Crypto Exchange - Complete Startup Script
+# ATLASX3 - Complete Startup Script
 
-Write-Host "🚀 AtlasX Crypto Exchange - Starting Application..." -ForegroundColor Cyan
+Write-Host "🚀 ATLASX3 - Starting Application..." -ForegroundColor Cyan
 Write-Host "================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if in correct directory
 if (-not (Test-Path "package.json")) {
     Write-Host "❌ Error: package.json not found!" -ForegroundColor Red
-    Write-Host "Please run this script from the crypto-exchange-app directory" -ForegroundColor Yellow
+    Write-Host "Please run this script from the atlasx3 directory" -ForegroundColor Yellow
     exit 1
 }
 
@@ -54,7 +54,7 @@ if (Test-Path ".env") {
 
 Write-Host "📍 Port: $port" -ForegroundColor White
 Write-Host "🌐 Local URL: http://localhost:$port" -ForegroundColor White
-Write-Host "🔗 Production URL: https://erc.dog" -ForegroundColor White
+Write-Host "🔗 Production URL: https://atlasx.online" -ForegroundColor White
 Write-Host ""
 
 Write-Host "🎯 Available Features:" -ForegroundColor Cyan

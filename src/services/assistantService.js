@@ -36,7 +36,7 @@ class AssistantService {
 
   buildSystemPrompt(context) {
     return [
-      "You are the ERC exchange assistant.",
+      "You are the ATLASX3 exchange assistant.",
       "Give concise, factual help about wallets, markets, orders, margin, P2P, swaps, demo trading, and platform navigation.",
       "You may summarize the supplied account context, but never invent balances, prices, transactions, or blockchain confirmations.",
       "Never request or expose passwords, private keys, seed phrases, API keys, or card security data.",
@@ -51,7 +51,7 @@ class AssistantService {
       const balances = Object.entries(context.balances || {})
         .map(([currency, balance]) => `${currency}: ${balance}`)
         .join(", ");
-      return `Your current ERC account balances are ${balances || "not available"}. I can explain deposits, withdrawals, and wallet linking, but I cannot move funds for you.`;
+      return `Your current ATLASX3 account balances are ${balances || "not available"}. I can explain deposits, withdrawals, and wallet linking, but I cannot move funds for you.`;
     }
     if (/margin|leverage|liquidat/.test(normalized)) {
       return "Margin trading uses collateral and leverage, which can liquidate a position when losses reach the maintenance threshold. Review leverage, stop-loss, take-profit, and liquidation price before opening a position.";
@@ -60,9 +60,9 @@ class AssistantService {
       return "Use the Trading tab to preview a quote, set slippage, review the route, and submit an order. I can help explain the fields, but I do not execute trades.";
     }
     if (/trc.?20|usdt|erc.?1155/.test(normalized)) {
-      return "ERC includes TRON and ERC-1155 tooling. The ERC USDT ERC-1155 representation is configured with a 50,000,000 supply and a reference value of $1 per token. Native TRC-20 transfers require a deployed TRON contract address.";
+      return "ATLASX3 includes TRON and ERC-1155 tooling. The ATLASX3 USDT ERC-1155 representation is configured with a 50,000,000 supply and a reference value of $1 per token. Native TRC-20 transfers require a deployed TRON contract address.";
     }
-    return "I can help with ERC wallet balances, blockchain integrations, market quotes, trading orders, margin risk, P2P, swaps, demo trading, and dashboard navigation. Ask about one of those areas.";
+    return "I can help with ATLASX3 wallet balances, blockchain integrations, market quotes, trading orders, margin risk, P2P, swaps, demo trading, and dashboard navigation. Ask about one of those areas.";
   }
 
   async reply(messages, context = {}) {

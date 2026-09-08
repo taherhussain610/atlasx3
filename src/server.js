@@ -71,6 +71,8 @@ function resolvePort() {
 }
 
 const PORT = resolvePort();
+const APP_NAME = "ATLASX3";
+const APP_SERVICE_NAME = "atlasx3-api";
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
 const NODE_ENV = process.env.NODE_ENV || "development";
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
@@ -87,7 +89,13 @@ const BSC_RPC_FALLBACK_URL =
 const BSC_RPC_API_KEY = process.env.BSC_RPC_API_KEY || process.env.TATUM_API_KEY || "";
 
 // TRON Configuration
-const TRON_NETWORK = process.env.TRON_NETWORK || "mainnet";
+const TRON_NETWORK = String(process.env.TRON_NETWORK || "mainnet")
+  .trim()
+  .toLowerCase();
+const SUPPORTED_TRON_NETWORKS = ["mainnet", "shasta", "nile"];
+if (!SUPPORTED_TRON_NETWORKS.includes(TRON_NETWORK)) {
+  throw new Error(`Invalid TRON_NETWORK '${TRON_NETWORK}'. Use mainnet, shasta, or nile.`);
+}
 const TRON_RPC_API_KEY = process.env.TRON_RPC_API_KEY || process.env.TATUM_API_KEY || "";
 
 // TRON Mainnet Endpoints
@@ -134,6 +142,51 @@ const TRON_ENDPOINTS = {
     walletsolidity: TRON_NILE_WALLETSOLIDITY,
   },
 };
+
+const DEFAULT_TRON_MAINNET_DEPOSIT_ADDRESS = "TXntJR1XuF3VeY6uZZ3i8uRYTLy6g7mMmZ";
+const TRON_DEPOSIT_ADDRESSES = {
+  mainnet: String(
+    process.env.TRON_MAINNET_DEPOSIT_ADDRESS || DEFAULT_TRON_MAINNET_DEPOSIT_ADDRESS
+  ).trim(),
+  shasta: String(process.env.TRON_SHASTA_DEPOSIT_ADDRESS || "").trim(),
+  nile: String(process.env.TRON_NILE_DEPOSIT_ADDRESS || "").trim(),
+};
+const TRON_DEPOSIT_ADDRESS = TRON_DEPOSIT_ADDRESSES[TRON_NETWORK];
+if (TRON_DEPOSIT_ADDRESS && !WalletService.isValidTronAddress(TRON_DEPOSIT_ADDRESS)) {
+  throw new Error(`Invalid TRON ${TRON_NETWORK} deposit address.`);
+}
+const TRON_EXPLORER_BASE_URLS = {
+  mainnet: "https://tronscan.org/#/address/",
+  shasta: "https://shasta.tronscan.org/#/address/",
+  nile: "https://nile.tronscan.org/#/address/",
+};
+
+async function fetchTrxPaymentQuote({ fiatCurrency }) {
+  try {
+    const currency = String(fiatCurrency || "").toLowerCase();
+    const response = await axios.get("https://api.coingecko.com/api/v3/simple/price", {
+      params: {
+        ids: "tron",
+        vs_currencies: currency,
+      },
+      timeout: 10000,
+    });
+    const price = response.data?.tron?.[currency];
+    if (!Number.isFinite(Number(price)) || Number(price) <= 0) {
+      throw new Error("Price was missing from the quote response");
+    }
+    return {
+      price: String(price),
+      provider: "coingecko",
+      quotedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    const quoteError = new Error("Unable to retrieve a live TRX quote");
+    quoteError.code = "QUOTE_UNAVAILABLE";
+    quoteError.cause = error;
+    throw quoteError;
+  }
+}
 
 const TATUM_DATA_API_URL = process.env.TATUM_DATA_API_URL || "https://api.tatum.io";
 const TATUM_DATA_API_KEY = process.env.TATUM_DATA_API_KEY || process.env.TATUM_API_KEY || "";
@@ -758,7 +811,11 @@ const copyTradingService = new CopyTradingService();
 const predictionMarketsService = new PredictionMarketsService();
 const apiKeysService = new APIKeysService();
 const metaTraderService = new MetaTraderService();
-const paymentGateway = new PaymentGatewayService();
+const paymentGateway = new PaymentGatewayService({
+  quoteProvider: fetchTrxPaymentQuote,
+  tronDepositAddress: TRON_DEPOSIT_ADDRESS,
+  tronNetwork: TRON_NETWORK,
+});
 const paymentTerminalService = new PaymentTerminalService();
 const assistantService = new AssistantService();
 
@@ -2334,7 +2391,8 @@ function getExplorerTxUrl(network, hash) {
     return `https://bscscan.com/tx/${normalized}`;
   }
   if (network === "tron") {
-    return `https://tronscan.org/#/transaction/${normalized.replace(/^0x/i, "")}`;
+    const baseUrl = TRON_EXPLORER_BASE_URLS[TRON_NETWORK].replace("/address/", "/transaction/");
+    return `${baseUrl}${normalized.replace(/^0x/i, "")}`;
   }
   return null;
 }
@@ -2404,12 +2462,13 @@ async function verifyTronTransaction(hash) {
 
   if (!tx) {
     return {
-      network: "tron",
+      chain: "tron",
+      network: TRON_NETWORK,
       hash: txHash,
       explorerUrl: getExplorerTxUrl("tron", txHash),
       found: false,
       chainIdHex,
-      message: "Transaction hash not found on Tron network",
+      message: `Transaction hash not found on TRON ${TRON_NETWORK}`,
     };
   }
 
@@ -2418,7 +2477,8 @@ async function verifyTronTransaction(hash) {
   const confirmations = txBlock ? Math.max(0, latestBlock - txBlock + 1) : 0;
 
   return {
-    network: "tron",
+    chain: "tron",
+    network: TRON_NETWORK,
     hash: txHash,
     explorerUrl: getExplorerTxUrl("tron", txHash),
     found: true,
@@ -2851,7 +2911,7 @@ app.get("/api/chart/series", auth, async (req, res, next) => {
 });
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, service: "crypto-exchange-api" });
+  res.json({ ok: true, name: APP_NAME, service: APP_SERVICE_NAME });
 });
 
 app.get("/api/assistant/status", auth, (_req, res) => {
@@ -2880,7 +2940,8 @@ app.post("/api/assistant/chat", auth, async (req, res) => {
 
 app.get("/api/port-status", (_req, res) => {
   res.json({
-    service: "crypto-exchange-api",
+    name: APP_NAME,
+    service: APP_SERVICE_NAME,
     port: PORT,
     host: "localhost",
     baseUrl: `http://localhost:${PORT}`,
@@ -2974,8 +3035,7 @@ app.get("/api/hardhat/contracts", auth, async (_req, res) => {
 
 app.get("/api/hardhat/accounts", auth, async (_req, res) => {
   try {
-    const node = await hardhatService.getNodeStatus();
-    return res.json({ accounts: node.accounts || [] });
+    return res.json(await hardhatService.listAccounts());
   } catch (error) {
     return sendHardhatError(res, error);
   }
@@ -3697,30 +3757,12 @@ app.get("/api/plugin/endpoints", (_req, res) => {
       },
       // ==================== WEBSOCKET SERVICE ENDPOINTS ====================
       {
-        key: "websocket-clients",
-        label: "/api/websocket/clients",
+        key: "websocket-status",
+        label: "/api/websocket/status",
         category: "websocket",
-        description: "Get list of connected WebSocket clients",
+        description: "Get aggregate authenticated realtime connection status",
         method: "GET",
-        route: "/api/websocket/clients",
-        requiresAuth: true,
-      },
-      {
-        key: "websocket-broadcast",
-        label: "/api/websocket/broadcast",
-        category: "websocket",
-        description: "Broadcast message to WebSocket channel",
-        method: "POST",
-        route: "/api/websocket/broadcast",
-        requiresAuth: true,
-      },
-      {
-        key: "websocket-send-to-user",
-        label: "/api/websocket/send-to-user",
-        category: "websocket",
-        description: "Send WebSocket message to specific user",
-        method: "POST",
-        route: "/api/websocket/send-to-user",
+        route: "/api/websocket/status",
         requiresAuth: true,
       },
       // ==================== QR CODE ENDPOINTS ====================
@@ -4168,11 +4210,26 @@ app.get("/api/bsc/config", auth, (_req, res) => {
   });
 });
 
+app.get("/api/tron/deposit-wallet", (_req, res) => {
+  res.json({
+    address: TRON_DEPOSIT_ADDRESS || null,
+    configured: Boolean(TRON_DEPOSIT_ADDRESS),
+    currency: "TRX",
+    network: TRON_NETWORK,
+    explorerUrl: TRON_DEPOSIT_ADDRESS
+      ? `${TRON_EXPLORER_BASE_URLS[TRON_NETWORK]}${encodeURIComponent(TRON_DEPOSIT_ADDRESS)}`
+      : null,
+    autoCredit: false,
+  });
+});
+
 app.get("/api/tron/config", auth, (_req, res) => {
   const networkInfo = tronService.getNetworkInfo();
   res.json({
     network: networkInfo.network,
     endpoints: networkInfo.endpoints,
+    depositAddress: TRON_DEPOSIT_ADDRESS || null,
+    depositAddressConfigured: Boolean(TRON_DEPOSIT_ADDRESS),
     usingApiKey: networkInfo.apiKey !== "none",
     apiKeyPreview: networkInfo.apiKey,
   });
@@ -4182,7 +4239,8 @@ app.get("/api/tron/block-number", auth, async (_req, res, next) => {
   try {
     const blockHex = await callTronRpcWithRetry("eth_blockNumber", [], 2);
     return res.json({
-      source: "tatum-tron-mainnet-gateway",
+      source: `tatum-tron-${TRON_NETWORK}-gateway`,
+      network: TRON_NETWORK,
       blockNumberHex: blockHex,
       blockNumber: parseInt(blockHex, 16),
     });
@@ -5943,7 +6001,8 @@ app.post("/api/tron/send", auth, async (req, res) => {
     res.json({
       success: true,
       txHash: result.txid || result,
-      network: "tron",
+      chain: "tron",
+      network: TRON_NETWORK,
     });
   } catch (error) {
     console.error("Error sending TRX:", error);
@@ -5966,7 +6025,8 @@ app.post("/api/tron/send-token", auth, async (req, res) => {
     res.json({
       success: true,
       txHash: result.txid || result,
-      network: "tron",
+      chain: "tron",
+      network: TRON_NETWORK,
       tokenAddress,
     });
   } catch (error) {
@@ -6319,7 +6379,7 @@ function getExplorerUrl(chain, txHash) {
     ethereum: `https://etherscan.io/tx/${txHash}`,
     bsc: `https://bscscan.com/tx/${txHash}`,
     solana: `https://solscan.io/tx/${txHash}`,
-    tron: `https://tronscan.org/#/transaction/${txHash}`,
+    tron: getExplorerTxUrl("tron", txHash),
   };
   return explorers[chain] || null;
 }
@@ -6862,50 +6922,6 @@ app.post("/api/tron/wallet-solidity-query", auth, async (req, res) => {
   } catch (error) {
     console.error("Error querying TRON wallet solidity:", error);
     res.status(500).json({ error: "Failed to query wallet solidity" });
-  }
-});
-
-// ============================================================================
-// WEBSOCKET SERVICE ENDPOINTS
-// ============================================================================
-
-// Get connected clients count
-app.get("/api/websocket/clients", auth, (_req, res) => {
-  try {
-    const count = wsService.connectedClients.size;
-    const clients = Array.from(wsService.connectedClients.entries()).map(([id, client]) => ({
-      id,
-      userId: client.userId,
-      subscriptions: Array.from(client.subscriptions),
-    }));
-    res.json({ count, clients });
-  } catch (error) {
-    console.error("Error fetching WebSocket clients:", error);
-    res.status(500).json({ error: "Failed to fetch WebSocket clients" });
-  }
-});
-
-// Broadcast message to channel
-app.post("/api/websocket/broadcast", auth, (req, res) => {
-  try {
-    const { channel, event, data } = req.body;
-    wsService.broadcast(channel, event, data);
-    res.json({ success: true, channel, event });
-  } catch (error) {
-    console.error("Error broadcasting message:", error);
-    res.status(500).json({ error: "Failed to broadcast message" });
-  }
-});
-
-// Send message to specific user
-app.post("/api/websocket/send-to-user", auth, (req, res) => {
-  try {
-    const { userId, event, data } = req.body;
-    wsService.sendToUser(userId, event, data);
-    res.json({ success: true, userId, event });
-  } catch (error) {
-    console.error("Error sending message to user:", error);
-    res.status(500).json({ error: "Failed to send message to user" });
   }
 });
 
@@ -7452,7 +7468,17 @@ app.post("/api/margin/position/open", auth, async (req, res) => {
 app.post("/api/margin/position/:positionId/close", auth, async (req, res) => {
   try {
     const { positionId } = req.params;
-    const { closePrice } = req.body;
+    const closePrice = Number(req.body.closePrice);
+    if (!Number.isFinite(closePrice) || closePrice <= 0) {
+      return res.status(400).json({ error: "Close price must be a positive number" });
+    }
+    const existingPosition = marginTradingService.getPosition(positionId);
+    if (!existingPosition) {
+      return res.status(404).json({ error: "Margin position not found" });
+    }
+    if (existingPosition.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
     const position = marginTradingService.closePosition(positionId, closePrice);
     res.json(position);
   } catch (error) {
@@ -8349,10 +8375,14 @@ app.get("/api/payment-terminal/protocols", auth, (req, res) => {
 // Process Card Payment
 app.post("/api/payment-terminal/process", auth, async (req, res) => {
   try {
+    const terminalId = `TERMINAL_${req.user.id}`;
+    if (!paymentTerminalService.terminals.has(terminalId)) {
+      paymentTerminalService.initializeTerminal(terminalId);
+    }
     const paymentData = {
       ...req.body,
       userId: req.user.id,
-      terminalId: `TERMINAL_${req.user.id}`,
+      terminalId,
     };
 
     const result = await paymentTerminalService.processPayment(paymentData);
@@ -9063,7 +9093,7 @@ app.post(
       .isIn(["USD", "EUR", "GBP", "AED", "AUD", "CAD", "JPY", "CHF"])
       .withMessage("Unsupported currency"),
     body("method")
-      .isIn(["card", "bank_transfer", "paypal", "crypto", "apple_pay", "google_pay", "sepa", "wire"])
+      .isIn(["card", "bank_transfer", "paypal", "apple_pay", "google_pay", "sepa", "wire"])
       .withMessage("Unsupported method"),
   ],
   async (req, res) => {
@@ -9097,9 +9127,13 @@ app.post(
 // POST /api/payments/crypto — create crypto payment address
 app.post(
   "/api/payments/crypto",
+  rateLimiters.blockchain,
   auth,
   [
-    body("amount").isFloat({ min: 0.01 }),
+    body("amount")
+      .isString()
+      .matches(/^(?:0|[1-9]\d{0,8})(?:\.\d{1,8})?$/)
+      .withMessage("amount must be a positive decimal string"),
     body("currency").isIn(["USD", "EUR", "GBP", "AED", "AUD", "CAD", "JPY", "CHF"]),
     body("cryptoSymbol").isIn(["BTC", "ETH", "USDT", "BNB", "SOL", "TRX", "ATX"]),
   ],
@@ -9114,6 +9148,16 @@ app.post(
         cryptoSymbol,
         metadata,
       });
+      const paymentMetadata = {
+        ...(metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata : {}),
+        address: payment.address,
+        autoCredit: payment.autoCredit,
+        cryptoAmount: payment.cryptoAmount,
+        cryptoSymbol: payment.cryptoSymbol,
+        network: payment.network,
+        quote: payment.quote,
+        quoteMode: payment.quoteMode,
+      };
       const stmt = db.prepare(
         "INSERT INTO payments (id, user_id, method, amount, currency, status, reference, qr_data, instructions, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       );
@@ -9126,12 +9170,12 @@ app.post(
         "awaiting_payment",
         payment.id,
         payment.qrData,
-        `Pay ${payment.cryptoAmount} ${payment.cryptoSymbol} to ${payment.address}`,
-        JSON.stringify(metadata)
+        `Pay ${payment.cryptoAmount} ${payment.cryptoSymbol}${payment.network ? ` on ${payment.network}` : ""} to ${payment.address}`,
+        JSON.stringify(paymentMetadata)
       );
       res.json({ success: true, payment });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(err.code === "QUOTE_UNAVAILABLE" ? 502 : 400).json({ error: err.message });
     }
   }
 );
@@ -9176,6 +9220,11 @@ app.post("/api/payments/:id/confirm", auth, (req, res) => {
   try {
     const row = db.prepare("SELECT * FROM payments WHERE id = ? AND user_id = ?").get(req.params.id, req.user.id);
     if (!row) return res.status(404).json({ error: "Payment not found" });
+    if (row.method === "crypto") {
+      return res.status(409).json({
+        error: "Crypto payments require on-chain verification and cannot be self-confirmed",
+      });
+    }
     db.prepare("UPDATE payments SET status = 'completed', completed_at = datetime('now') WHERE id = ?").run(
       req.params.id
     );
@@ -9706,9 +9755,11 @@ app.post("/api/risk/stress-test", auth, async (req, res) => {
           : { ...holding, value: holding.value ?? holding.quantity * holding.price },
       ])
     );
-    res.json(
-      riskManagementService.stressTestPortfolio(normalizedPortfolio, scenarios || [])
+    const stressTestResults = riskManagementService.stressTestPortfolio(
+      normalizedPortfolio,
+      scenarios || []
     );
+    res.json({ ...stressTestResults, stressTestResults });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -9991,7 +10042,13 @@ app.post("/api/optimization/momentum-rebalance", auth, async (req, res) => {
 const server = http.createServer(app);
 
 // Initialize WebSocket Service
-const wsService = new WebSocketService(server);
+const wsService = new WebSocketService(server, {
+  corsOrigin: CORS_ORIGIN,
+  authenticate(token) {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return findUserByIdStmt.get(payload.sub);
+  },
+});
 
 // Initialize Blockchain Services
 let ethereumService, bscService, solanaService, tronService, cryptoDataService, erc1155Service;
@@ -10063,8 +10120,8 @@ app.use((err, req, res, _next) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Crypto exchange API running on http://localhost:${PORT}`);
-  console.log(`WebSocket server ready for real-time updates`);
+  console.log(`${APP_NAME} API running on http://localhost:${PORT}`);
+  console.log(`${APP_NAME} WebSocket server ready for real-time updates`);
   if (JWT_SECRET === "dev-secret-change-me") {
     console.warn(
       "Warning: using default JWT secret. Set JWT_SECRET in .env for production-like use."

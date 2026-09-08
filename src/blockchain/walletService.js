@@ -27,6 +27,23 @@ class WalletService {
   }
 
   /**
+   * Validate a TRON Base58Check address
+   * @param {string} address - TRON address
+   * @returns {boolean} True if valid
+   */
+  static isValidTronAddress(address) {
+    if (typeof address !== "string" || !address.trim()) {
+      return false;
+    }
+
+    try {
+      return TronWeb.isAddress(address.trim());
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Generate Ethereum wallet from mnemonic
    * @param {string} mnemonic - Mnemonic phrase
    * @param {number} index - Account index (default: 0)

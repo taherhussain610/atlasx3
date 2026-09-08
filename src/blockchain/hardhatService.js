@@ -159,6 +159,22 @@ class HardhatService {
     return node;
   }
 
+  async listAccounts() {
+    const node = await this.requireOnlineNode();
+    const accountDetails = await Promise.all(
+      node.accounts.map(async (address) => ({
+        address,
+        balance: ethers.formatEther(await this.provider.getBalance(address)),
+      }))
+    );
+    return {
+      chainId: node.chainId,
+      blockNumber: node.blockNumber,
+      accounts: node.accounts,
+      accountDetails,
+    };
+  }
+
   async requireDeployment() {
     await this.requireOnlineNode();
     const deployment = this.readDeployment();

@@ -1,7 +1,7 @@
 {
-  "name": "crypto-exchange-app",
+  "name": "atlasx3",
   "version": "1.0.0",
-  "description": "Multi-currency crypto wallet and exchange demo app",
+  "description": "ATLASX3 multi-chain crypto wallet and exchange application",
   "main": "src/server.js",
   "scripts": {
     "start": "node ./scripts/stop.js && node src/server.js",

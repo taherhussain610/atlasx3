@@ -1,6 +1,6 @@
-# AtlasX Exchange Terminal
+# ATLASX3
 
-AtlasX Exchange Terminal is a multi-chain crypto exchange application for trading, DeFi workflows, portfolio discovery, and blockchain operations from one dashboard.
+ATLASX3 is a multi-chain crypto exchange application for trading, DeFi workflows, portfolio discovery, and blockchain operations from one dashboard.
 
 ## Prerequisites
 
@@ -31,6 +31,7 @@ Then edit `.env` with your API keys and network settings.
 | `SOLANA_RPC_URL` | Solana RPC endpoint used for Solana wallet and balance operations. |
 | `BSC_RPC_URL` | BNB Smart Chain RPC endpoint for BSC balance and chain calls. |
 | `TRON_NETWORK` | TRON target network selection for TRON workflows. |
+| `TRON_MAINNET_DEPOSIT_ADDRESS` | Public mainnet TRX receiving address displayed by the wallet and payment interfaces. |
 | `SMTP_HOST` | SMTP host for outbound email and onboarding messages. |
 | `METATRADER_API_URL` | MetaTrader bridge endpoint for account and order workflows. |
 
@@ -78,6 +79,8 @@ npm run lint
 - BSC
 - Solana
 - TRON
+
+The configured TRX receiving wallet is shown in the Wallet and Payments panels. Transfers require manual verification and do not automatically credit an exchange balance.
 
 ## Smart Contracts
 
