@@ -4,7 +4,7 @@ const chalk = require('chalk');
 const BASE_URL = 'http://localhost:4000';
 
 async function checkApplicationStatus() {
-  console.log('🔍 AtlasX Crypto Exchange - Complete Application Status Check\n');
+  console.log('🔍 ATLASX3 - Complete Application Status Check\n');
   console.log('═══════════════════════════════════════════════════════════\n');
 
   const results = {

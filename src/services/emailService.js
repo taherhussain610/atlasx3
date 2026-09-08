@@ -14,11 +14,11 @@ class EmailService {
     this.userConfigured = Boolean(process.env.SMTP_USER);
     this.passwordConfigured = Boolean(process.env.SMTP_PASSWORD);
     this.from = process.env.SMTP_FROM || "noreply@localhost";
-    this.fromName = process.env.SMTP_FROM_NAME || "Crypto Exchange";
+    this.fromName = process.env.SMTP_FROM_NAME || "ATLASX3";
     this.adminEmail = process.env.ADMIN_EMAIL || this.from;
     this.trackOpens = process.env.SMTP_TRACK_OPENS === "true";
     this.trackInbox = process.env.SMTP_TRACK_INBOX !== "false";
-    this.campaignId = process.env.SMTP_CAMPAIGN_ID || "erc-transactional";
+    this.campaignId = process.env.SMTP_CAMPAIGN_ID || "atlasx3-transactional";
 
     // Initialize transporter only if SMTP credentials are provided
     if (this.host && this.userConfigured) {
@@ -162,9 +162,9 @@ class EmailService {
    * Send welcome email to new user
    */
   async sendWelcomeEmail(user) {
-    const subject = "Welcome to ERC Crypto Exchange";
+    const subject = `Welcome to ${this.fromName}`;
     const html = `
-      <h2>Welcome to ERC, ${user.username}!</h2>
+      <h2>Welcome to ${this.fromName}, ${user.username}!</h2>
       <p>Your account has been successfully created.</p>
       <p><strong>Email:</strong> ${user.email}</p>
       <p><strong>Username:</strong> ${user.username}</p>
@@ -172,13 +172,13 @@ class EmailService {
       <p>Get started by depositing funds or exploring our blockchain integration features.</p>
       <p>If you have any questions, please contact us at ${this.adminEmail}</p>
       <hr>
-      <p style="color: #666; font-size: 12px;">This is an automated message from ERC Crypto Exchange</p>
+      <p style="color: #666; font-size: 12px;">This is an automated message from ${this.fromName}</p>
     `;
 
     return this.sendEmail({
       to: user.email,
       subject,
-      text: `Welcome to ERC, ${user.username}! Your account has been successfully created.`,
+      text: `Welcome to ${this.fromName}, ${user.username}! Your account has been successfully created.`,
       html,
     });
   }
@@ -288,7 +288,7 @@ class EmailService {
       <p style="color: #d9534f;"><strong>If this was not you, please secure your account immediately.</strong></p>
       <p>Contact us at ${this.adminEmail} if you need assistance.</p>
       <hr>
-      <p style="color: #666; font-size: 12px;">This is an automated security alert from ERC Crypto Exchange</p>
+      <p style="color: #666; font-size: 12px;">This is an automated security alert from ${this.fromName}</p>
     `;
 
     return this.sendEmail({
@@ -308,7 +308,7 @@ class EmailService {
       <p>${message}</p>
       <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
       <hr>
-      <p style="color: #666; font-size: 12px;">Automated notification from ERC Crypto Exchange</p>
+      <p style="color: #666; font-size: 12px;">Automated notification from ${this.fromName}</p>
     `;
 
     return this.sendEmail({

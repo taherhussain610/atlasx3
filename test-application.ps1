@@ -1,8 +1,8 @@
 #!/usr/bin/env pwsh
-# AtlasX Crypto Exchange - Application Test & Verification Script
+# ATLASX3 - Application Test & Verification Script
 
 Write-Host ""
-Write-Host "🧪 AtlasX Crypto Exchange - Application Testing" -ForegroundColor Cyan
+Write-Host "🧪 ATLASX3 - Application Testing" -ForegroundColor Cyan
 Write-Host "================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -24,7 +24,7 @@ try {
 Write-Host "Test 2: Frontend Loading..." -ForegroundColor Yellow
 try {
     $html = Invoke-WebRequest -Uri "http://localhost:4000" -UseBasicParsing -ErrorAction Stop
-    if ($html.Content -match "AtlasX") {
+    if ($html.Content -match "ATLASX3") {
         Write-Host "  ✅ Frontend loads successfully" -ForegroundColor Green
     }
 } catch {

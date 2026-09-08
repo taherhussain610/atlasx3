@@ -439,7 +439,7 @@ async function hydrateSession() {
     });
     setUser(me.user || me);
   } catch {
-    setUser({ id: 1, email: "session@atlasx.dev", username: "Session Trader" });
+    setUser({ id: 1, email: "session@atlasx3.dev", username: "Session Trader" });
   }
 
   await refreshDashboard();
@@ -742,7 +742,7 @@ function renderComparePrices() {
 function compareExchangePrices() {
   const symbol = String(document.getElementById("compareSymbol")?.value || "BTC").trim().toUpperCase() || "BTC";
   const basePrice = getMarketSnapshot(symbol).price || 100;
-  const exchanges = ["AtlasX", "CoinHub", "Vertex", "Bluefin", "KrakenX"];
+  const exchanges = ["ATLASX3", "CoinHub", "Vertex", "Bluefin", "KrakenX"];
   state.compareRows = exchanges.map((exchange, index) => {
     const bid = basePrice - index * Math.max(basePrice * 0.0008, 0.01);
     const ask = basePrice + index * Math.max(basePrice * 0.0009, 0.01) + Math.max(basePrice * 0.0005, 0.01);
@@ -1047,7 +1047,7 @@ function exportJournalCsv() {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `atlasx-journal-${Date.now()}.csv`;
+  link.download = `atlasx3-journal-${Date.now()}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -3140,7 +3140,7 @@ function renderDexTokens() {
           <td>${escapeHtml(token.symbol || "N/A")}</td>
           <td>${escapeHtml(token.name || "N/A")}</td>
           <td>${escapeHtml(token.address || token.contractAddress || token.assetAddress || "N/A")}</td>
-          <td>${escapeHtml(token.chain || token.network || "AtlasX")}</td>
+          <td>${escapeHtml(token.chain || token.network || "ATLASX3")}</td>
         </tr>
       `
     )
@@ -3695,7 +3695,7 @@ function renderHardhatAssets() {
   }
 
   if (!state.dashboard.hardhatAssets.length) {
-    body.innerHTML = '<tr><td colspan="5" class="empty">Deploy AtlasX contracts to load local DEX addresses.</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="empty">Deploy ATLASX3 contracts to load local DEX addresses.</td></tr>';
     return;
   }
 
@@ -3749,7 +3749,7 @@ function appendAssistantMessage(role, message) {
     .map(
       (item) => `
         <article>
-          <strong>${item.role === "user" ? "You" : "AtlasX"}</strong>
+          <strong>${item.role === "user" ? "You" : "ATLASX3"}</strong>
           <p class="meta">${escapeHtml(item.message)}</p>
         </article>
       `
@@ -4038,7 +4038,7 @@ async function loadDexTokens() {
     state.dashboard.dexTokens = normalizeList(result, ["tokens"]);
   } catch {
     state.dashboard.dexTokens = [
-      { symbol: "ATX", name: "AtlasX Token", address: "N/A", chain: "AtlasX" },
+      { symbol: "ATX", name: "ATLASX3 Token", address: "N/A", chain: "ATLASX3" },
     ];
   }
 
@@ -4407,9 +4407,9 @@ async function sendEmailTest() {
     key: "email-test",
     method: "POST",
     body: {
-      to: state.user?.email || "trader@atlasx.dev",
-      subject: "AtlasX SMTP test",
-      text: "Integration check from AtlasX dashboard.",
+      to: state.user?.email || "trader@atlasx3.dev",
+      subject: "ATLASX3 SMTP test",
+      text: "Integration check from the ATLASX3 dashboard.",
     },
   });
 }
@@ -4503,7 +4503,7 @@ async function chatWithAssistant(message) {
 
 async function processTerminalPayment(formData) {
   if (!state.user) {
-    state.user = { id: 1, email: "trader@atlasx.dev", username: "Demo Trader" };
+    state.user = { id: 1, email: "trader@atlasx3.dev", username: "Demo Trader" };
   }
 
   const result = await apiCall("/api/payment-terminal/process", {
@@ -4744,7 +4744,7 @@ function exportPaymentHistoryCsv() {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `atlasx-payments-${Date.now()}.csv`;
+  link.download = `atlasx3-payments-${Date.now()}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -5506,7 +5506,7 @@ function bindGlobalHandlers() {
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `atlasx-tax-${Date.now()}.csv`;
+      link.download = `atlasx3-tax-${Date.now()}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -5520,7 +5520,7 @@ function bindGlobalHandlers() {
     }
 
     if (action === "create-api-key") {
-      const name = String(document.getElementById("apiKeyName")?.value || "AtlasX Key").trim() || "AtlasX Key";
+      const name = String(document.getElementById("apiKeyName")?.value || "ATLASX3 Key").trim() || "ATLASX3 Key";
       const ipWhitelist = String(document.getElementById("apiKeyIp")?.value || "").trim();
       const permissions = [
         document.getElementById("permRead")?.checked ? "read" : "",
@@ -5763,7 +5763,7 @@ function bindGlobalHandlers() {
 
     if (action === "hardhat-deploy-all") {
       const result = await deployHardhat().catch((error) => ({
-        error: `Unable to deploy AtlasX contracts right now. ${error.message}` ,
+        error: `Unable to deploy ATLASX3 contracts right now. ${error.message}` ,
       }));
       updateHardhatLog("hardhatDeployLog", result, "Deployment result");
       state.dashboard.hardhatAssets = normalizeHardhatContracts(result);
@@ -6040,7 +6040,7 @@ async function bootstrap() {
   bindFormHandlers();
   bindGlobalHandlers();
   connectWebSocket();
-  appendAssistantMessage("assistant", "AtlasX assistant ready. Ask for risk summaries, on-chain status or desk workflows.");
+  appendAssistantMessage("assistant", "ATLASX3 assistant ready. Ask for risk summaries, on-chain status or desk workflows.");
   await loadTronDepositWallet();
   await loadAssistantStatus().catch(() => null);
   await hydrateSession();
