@@ -14,9 +14,23 @@ const PaymentTerminalService = require("../src/services/paymentTerminalService")
 const P2PTradingService = require("../src/services/p2pTradingService");
 const TokenSwapService = require("../src/services/tokenSwapService");
 const AssistantService = require("../src/services/assistantService");
+const TechnicalIndicators = require("../src/services/technicalIndicators");
+const { RequestValidator } = require("../src/utils/advancedFeatures");
 
 const appSource = fs.readFileSync(
   path.join(__dirname, "..", "public", "app.js"),
+  "utf8",
+);
+const advancedRoutesSource = fs.readFileSync(
+  path.join(__dirname, "..", "src", "routes", "advancedRoutes.js"),
+  "utf8",
+);
+const websocketServiceSource = fs.readFileSync(
+  path.join(__dirname, "..", "src", "blockchain", "webSocketService.js"),
+  "utf8",
+);
+const hardhatServiceSource = fs.readFileSync(
+  path.join(__dirname, "..", "src", "blockchain", "hardhatService.js"),
   "utf8",
 );
 const indexSource = fs.readFileSync(
@@ -224,9 +238,67 @@ test("margin positions expose the fields consumed by the UI", () => {
 
   assert.ok(position.positionId);
   assert.equal(position.positionSize, 200);
+  assert.throws(
+    () => service.closePosition(position.positionId, undefined),
+    /Close price must be a positive number/,
+  );
+  assert.equal(position.status, "open");
   assert.equal(
     service.closePosition(position.positionId, 110).status,
     "closed",
+  );
+  assert.deepEqual(
+    RequestValidator.validateTradingParams({
+      symbol: "BTC/USDT",
+      side: "long",
+      collateral: 100,
+      leverage: 2,
+      entryPrice: 100,
+    }),
+    { valid: true, errors: [] },
+  );
+  assert.equal(
+    RequestValidator.validateTradingParams({
+      symbol: "BTC/USDT",
+      side: "above",
+      collateral: 0,
+      leverage: 0,
+      entryPrice: "invalid",
+    }).valid,
+    false,
+  );
+});
+
+test("advanced indicator contracts use valid OHLC data", () => {
+  const highs = [10, 12, 13, 14, 15, 16];
+  const lows = [8, 9, 10, 11, 12, 13];
+  const closes = [9, 11, 12, 13, 14, 15];
+  const stochastic = TechnicalIndicators.calculateStochastic(
+    highs,
+    lows,
+    closes,
+    3,
+  );
+
+  assert.equal(stochastic.length, 4);
+  assert.equal(stochastic.every(Number.isFinite), true);
+  assert.deepEqual(
+    TechnicalIndicators.calculateStochastic(
+      [5, 5, 5],
+      [5, 5, 5],
+      [5, 5, 5],
+      3,
+    ),
+    [0],
+  );
+  assert.match(
+    advancedRoutesSource,
+    /calculateStochastic\(highs, lows, closes, period\)/,
+  );
+  assert.match(advancedRoutesSource, /indicators\.stochastic = \{/);
+  assert.match(
+    serverSource,
+    /res\.json\(\{ \.\.\.stressTestResults, stressTestResults \}\)/,
   );
 });
 
@@ -430,20 +502,22 @@ test("frontend routes remain aligned with implemented endpoints", () => {
     appSource,
     /`\/api\/\$\{network\}\/transaction\/\$\{encodeURIComponent\(txHash\)\}`/,
   );
-  assert.match(appSource, /const wsOrigin = window\.location\.origin/);
-  assert.doesNotMatch(
-    appSource,
-    /new WebSocketManager\("http:\/\/localhost:4000"\)/,
-  );
+  assert.match(indexSource, /src="\/socket\.io\/socket\.io\.js"/);
+  assert.match(appSource, /window\.io\(\{/);
+  assert.match(websocketServiceSource, /socket\.handshake\.auth\?\.token/);
+  assert.match(websocketServiceSource, /socket\.join\(`user:\$\{userId\}`\)/);
+  assert.doesNotMatch(serverSource, /app\.post\("\/api\/websocket\/broadcast"/);
+  assert.doesNotMatch(serverSource, /app\.post\("\/api\/websocket\/send-to-user"/);
   assert.match(serverSource, /app\.post\("\/api\/email\/verify"/);
   assert.match(serverSource, /app\.post\("\/api\/email\/test"/);
   assert.match(serverSource, /app\.get\("\/api\/assistant\/status"/);
   assert.match(serverSource, /app\.post\("\/api\/assistant\/chat"/);
   assert.match(serverSource, /app\.get\("\/api\/hardhat\/contracts"/);
   assert.match(serverSource, /app\.get\("\/api\/hardhat\/accounts"/);
-  assert.match(serverSource, /accounts: node\.accounts \|\| \[\]/);
+  assert.match(serverSource, /hardhatService\.listAccounts\(\)/);
   assert.match(appSource, /\/api\/hardhat\/accounts/);
   assert.match(appSource, /\/api\/hardhat\/assets/);
+  assert.doesNotMatch(appSource, /\/api\/hardhat\/(?:mint|pair|liquidity)/);
   assert.match(indexSource, /id="assistantForm"/);
   assert.match(appSource, /\/api\/email\/verify/);
   assert.match(appSource, /\/api\/email\/test/);
@@ -464,17 +538,16 @@ test("frontend routes remain aligned with implemented endpoints", () => {
     serverSource,
     /initializeTerminal\(`TERMINAL_\$\{req\.user\.id\}`/,
   );
-  assert.match(serverSource, /terminalId: `TERMINAL_\$\{req\.user\.id\}`/);
+  assert.match(serverSource, /const terminalId = `TERMINAL_\$\{req\.user\.id\}`/);
+  assert.match(
+    serverSource,
+    /if \(!paymentTerminalService\.terminals\.has\(terminalId\)\)/,
+  );
   assert.match(serverSource, /key: "payment-terminal-process"/);
   assert.match(serverSource, /key: "payment-terminal-transactions"/);
   assert.match(appSource, /key: "payment-terminal-process"/);
   assert.match(appSource, /key: "payment-terminal-transactions"/);
   assert.doesNotMatch(serverSource, /parseStoredNumber|\btoAtomic\(/);
-  assert.doesNotMatch(
-    serverSource,
-    /\bwebSocketService\.(?:connectedClients|broadcast|sendToUser)/,
-  );
-  assert.match(serverSource, /wsService\.broadcast\(channel, event, data\)/);
   assert.match(appSource, /await refreshDashboard\(\)/);
 });
 
@@ -484,6 +557,11 @@ test("advanced panels share the authenticated application session", () => {
   assert.match(appSource, /localStorage\.removeItem\("token"\)/);
   assert.match(appSource, /terminalId: `TERMINAL_\$\{state\.user\.id\}`/);
   assert.match(appSource, /document\.querySelectorAll\("\.dashboard-tab"\)/);
+  assert.match(appSource, /apiCall\("\/api\/me"/);
+  assert.doesNotMatch(appSource, /apiCall\("\/api\/auth\/me"/);
+  assert.doesNotMatch(appSource, /username: "Session Trader"/);
+  assert.match(appSource, /error\.status === 401 \|\| error\.status === 403/);
+  assert.match(appSource, /error\.status = response\.status/);
   assert.doesNotMatch(appSource, /const allowed = new Set\(\["overviewPanel"/);
 });
 
@@ -491,10 +569,16 @@ test("Hardhat registry workflow is available through authenticated API and UI co
   assert.match(indexSource, /id="hardhatPanel"/);
   assert.match(indexSource, /id="hardhatAssetForm"/);
   assert.match(indexSource, /id="hardhatAssetsBody"/);
+  assert.match(indexSource, /id="hardhatStatus"/);
+  assert.match(indexSource, /id="hardhatCompileBtn"/);
+  assert.match(indexSource, /id="hardhatDeployBtn"/);
   assert.match(appSource, /\/api\/hardhat\/status/);
   assert.match(appSource, /\/api\/hardhat\/compile/);
   assert.match(appSource, /\/api\/hardhat\/deploy/);
   assert.match(appSource, /\/api\/hardhat\/assets/);
+  assert.match(appSource, /result\.accountDetails \|\| result\.accounts/);
+  assert.match(hardhatServiceSource, /accounts: node\.accounts/);
+  assert.match(hardhatServiceSource, /accountDetails/);
   assert.match(serverSource, /app\.get\("\/api\/hardhat\/status", auth/);
   assert.match(serverSource, /app\.post\("\/api\/hardhat\/deploy", auth/);
   assert.match(serverSource, /body\("symbol"\)/);
@@ -502,6 +586,18 @@ test("Hardhat registry workflow is available through authenticated API and UI co
   assert.match(hardhatContractSource, /function registerAsset/);
   assert.match(hardhatContractSource, /function totalAssets/);
   assert.match(hardhatContractSource, /function assetAt/);
+});
+
+test("advanced controls fail closed instead of fabricating transactions", () => {
+  assert.match(indexSource, /id="navSearchInput"/);
+  assert.match(appSource, /function handleSectionTabKeydown/);
+  assert.match(appSource, /tab\.setAttribute\("role", "tab"\)/);
+  assert.doesNotMatch(appSource, /\/api\/crypto\/bridge/);
+  assert.doesNotMatch(appSource, /0xBRIDGE|0xLAUNCH|mock-deployed/);
+  assert.match(indexSource, /Cross-chain Bridge Planner/);
+  assert.match(indexSource, /Token Launch Planner/);
+  assert.match(appSource, /prediction: normalizedPrediction/);
+  assert.doesNotMatch(appSource, /prediction: "above"/);
 });
 
 test("every P2P navigation tab has a functional panel", () => {

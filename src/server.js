@@ -3035,8 +3035,7 @@ app.get("/api/hardhat/contracts", auth, async (_req, res) => {
 
 app.get("/api/hardhat/accounts", auth, async (_req, res) => {
   try {
-    const node = await hardhatService.getNodeStatus();
-    return res.json({ accounts: node.accounts || [] });
+    return res.json(await hardhatService.listAccounts());
   } catch (error) {
     return sendHardhatError(res, error);
   }
@@ -3758,30 +3757,12 @@ app.get("/api/plugin/endpoints", (_req, res) => {
       },
       // ==================== WEBSOCKET SERVICE ENDPOINTS ====================
       {
-        key: "websocket-clients",
-        label: "/api/websocket/clients",
+        key: "websocket-status",
+        label: "/api/websocket/status",
         category: "websocket",
-        description: "Get list of connected WebSocket clients",
+        description: "Get aggregate authenticated realtime connection status",
         method: "GET",
-        route: "/api/websocket/clients",
-        requiresAuth: true,
-      },
-      {
-        key: "websocket-broadcast",
-        label: "/api/websocket/broadcast",
-        category: "websocket",
-        description: "Broadcast message to WebSocket channel",
-        method: "POST",
-        route: "/api/websocket/broadcast",
-        requiresAuth: true,
-      },
-      {
-        key: "websocket-send-to-user",
-        label: "/api/websocket/send-to-user",
-        category: "websocket",
-        description: "Send WebSocket message to specific user",
-        method: "POST",
-        route: "/api/websocket/send-to-user",
+        route: "/api/websocket/status",
         requiresAuth: true,
       },
       // ==================== QR CODE ENDPOINTS ====================
@@ -6944,50 +6925,6 @@ app.post("/api/tron/wallet-solidity-query", auth, async (req, res) => {
   }
 });
 
-// ============================================================================
-// WEBSOCKET SERVICE ENDPOINTS
-// ============================================================================
-
-// Get connected clients count
-app.get("/api/websocket/clients", auth, (_req, res) => {
-  try {
-    const count = wsService.connectedClients.size;
-    const clients = Array.from(wsService.connectedClients.entries()).map(([id, client]) => ({
-      id,
-      userId: client.userId,
-      subscriptions: Array.from(client.subscriptions),
-    }));
-    res.json({ count, clients });
-  } catch (error) {
-    console.error("Error fetching WebSocket clients:", error);
-    res.status(500).json({ error: "Failed to fetch WebSocket clients" });
-  }
-});
-
-// Broadcast message to channel
-app.post("/api/websocket/broadcast", auth, (req, res) => {
-  try {
-    const { channel, event, data } = req.body;
-    wsService.broadcast(channel, event, data);
-    res.json({ success: true, channel, event });
-  } catch (error) {
-    console.error("Error broadcasting message:", error);
-    res.status(500).json({ error: "Failed to broadcast message" });
-  }
-});
-
-// Send message to specific user
-app.post("/api/websocket/send-to-user", auth, (req, res) => {
-  try {
-    const { userId, event, data } = req.body;
-    wsService.sendToUser(userId, event, data);
-    res.json({ success: true, userId, event });
-  } catch (error) {
-    console.error("Error sending message to user:", error);
-    res.status(500).json({ error: "Failed to send message to user" });
-  }
-});
-
 // Generate QR code for crypto address
 app.get("/api/qrcode/generate", auth, async (req, res) => {
   try {
@@ -7531,7 +7468,17 @@ app.post("/api/margin/position/open", auth, async (req, res) => {
 app.post("/api/margin/position/:positionId/close", auth, async (req, res) => {
   try {
     const { positionId } = req.params;
-    const { closePrice } = req.body;
+    const closePrice = Number(req.body.closePrice);
+    if (!Number.isFinite(closePrice) || closePrice <= 0) {
+      return res.status(400).json({ error: "Close price must be a positive number" });
+    }
+    const existingPosition = marginTradingService.getPosition(positionId);
+    if (!existingPosition) {
+      return res.status(404).json({ error: "Margin position not found" });
+    }
+    if (existingPosition.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
     const position = marginTradingService.closePosition(positionId, closePrice);
     res.json(position);
   } catch (error) {
@@ -8428,10 +8375,14 @@ app.get("/api/payment-terminal/protocols", auth, (req, res) => {
 // Process Card Payment
 app.post("/api/payment-terminal/process", auth, async (req, res) => {
   try {
+    const terminalId = `TERMINAL_${req.user.id}`;
+    if (!paymentTerminalService.terminals.has(terminalId)) {
+      paymentTerminalService.initializeTerminal(terminalId);
+    }
     const paymentData = {
       ...req.body,
       userId: req.user.id,
-      terminalId: `TERMINAL_${req.user.id}`,
+      terminalId,
     };
 
     const result = await paymentTerminalService.processPayment(paymentData);
@@ -9804,9 +9755,11 @@ app.post("/api/risk/stress-test", auth, async (req, res) => {
           : { ...holding, value: holding.value ?? holding.quantity * holding.price },
       ])
     );
-    res.json(
-      riskManagementService.stressTestPortfolio(normalizedPortfolio, scenarios || [])
+    const stressTestResults = riskManagementService.stressTestPortfolio(
+      normalizedPortfolio,
+      scenarios || []
     );
+    res.json({ ...stressTestResults, stressTestResults });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -10089,7 +10042,13 @@ app.post("/api/optimization/momentum-rebalance", auth, async (req, res) => {
 const server = http.createServer(app);
 
 // Initialize WebSocket Service
-const wsService = new WebSocketService(server);
+const wsService = new WebSocketService(server, {
+  corsOrigin: CORS_ORIGIN,
+  authenticate(token) {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return findUserByIdStmt.get(payload.sub);
+  },
+});
 
 // Initialize Blockchain Services
 let ethereumService, bscService, solanaService, tronService, cryptoDataService, erc1155Service;

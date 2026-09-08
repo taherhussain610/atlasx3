@@ -128,13 +128,30 @@ class CircuitBreaker {
 class RequestValidator {
   static validateTradingParams(params) {
     const errors = [];
+    const collateral = Number(params.collateral);
+    const entryPrice = Number(params.entryPrice);
+    const leverage = Number(params.leverage);
 
     if (!params.symbol) errors.push("Symbol is required");
-    if (params.amount && params.amount <= 0) errors.push("Amount must be positive");
-    if (params.leverage && (params.leverage < 1 || params.leverage > 100))
+    if (!["long", "short"].includes(String(params.side || "").toLowerCase()))
+      errors.push("Side must be long or short");
+    if (!Number.isFinite(collateral) || collateral <= 0)
+      errors.push("Collateral must be positive");
+    if (!Number.isFinite(entryPrice) || entryPrice <= 0)
+      errors.push("Entry price must be positive");
+    if (!Number.isFinite(leverage) || leverage < 1 || leverage > 100)
       errors.push("Leverage must be between 1 and 100");
-    if (params.stopLoss && params.stopLoss < 0) errors.push("Stop loss must be non-negative");
-    if (params.takeProfit && params.takeProfit <= 0)
+    if (
+      params.stopLoss != null &&
+      params.stopLoss !== "" &&
+      (!Number.isFinite(Number(params.stopLoss)) || Number(params.stopLoss) <= 0)
+    )
+      errors.push("Stop loss must be positive");
+    if (
+      params.takeProfit != null &&
+      params.takeProfit !== "" &&
+      (!Number.isFinite(Number(params.takeProfit)) || Number(params.takeProfit) <= 0)
+    )
       errors.push("Take profit must be positive");
 
     return {
@@ -341,18 +358,13 @@ class WebSocketBroadcaster {
   }
 
   broadcast(message) {
-    if (this.wsService && this.wsService.server) {
-      // Send to all connected clients if no userId, or specific user if userId provided
-      const targetClients = message.userId
-        ? this.wsService.getClientsByUserId?.(message.userId) || []
-        : this.wsService.getConnectedClients?.() || [];
-
-      targetClients.forEach((client) => {
-        if (client.readyState === 1) {
-          // OPEN state
-          client.send(JSON.stringify(message));
-        }
-      });
+    if (!this.wsService) {
+      return;
+    }
+    if (message.userId) {
+      this.wsService.sendToUser(message.userId, message.type, message.data);
+    } else {
+      this.wsService.broadcastToAll(message.type, message.data);
     }
   }
 }

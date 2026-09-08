@@ -76,17 +76,34 @@ class MarginTradingService {
       takeProfit
     } = config;
 
+    const normalizedSide = String(side || '').toLowerCase();
+    const normalizedCollateral = Number(collateral);
+    const normalizedLeverage = Number(leverage);
+    const normalizedEntryPrice = Number(entryPrice);
+    if (!symbol || !['long', 'short'].includes(normalizedSide)) {
+      throw new Error('A symbol and valid position side are required');
+    }
+    if (!Number.isFinite(normalizedCollateral) || normalizedCollateral <= 0) {
+      throw new Error('Collateral must be a positive number');
+    }
+    if (!Number.isFinite(normalizedLeverage) || normalizedLeverage < 1) {
+      throw new Error('Leverage must be at least 1');
+    }
+    if (!Number.isFinite(normalizedEntryPrice) || normalizedEntryPrice <= 0) {
+      throw new Error('Entry price must be a positive number');
+    }
+
     // Validate leverage
-    if (leverage > account.maxLeverage) {
+    if (normalizedLeverage > account.maxLeverage) {
       throw new Error(`Max leverage for your risk tier is ${account.maxLeverage}x`);
     }
 
     // Calculate position size
-    const positionSize = collateral * leverage;
-    const borrowedAmount = positionSize - collateral;
+    const positionSize = normalizedCollateral * normalizedLeverage;
+    const borrowedAmount = positionSize - normalizedCollateral;
 
     // Check available balance
-    if (collateral > account.balance) {
+    if (normalizedCollateral > account.balance) {
       throw new Error('Insufficient collateral balance');
     }
 
@@ -96,18 +113,22 @@ class MarginTradingService {
       positionId,
       userId,
       symbol,
-      side,
-      collateral,
-      leverage,
+      side: normalizedSide,
+      collateral: normalizedCollateral,
+      leverage: normalizedLeverage,
       positionSize,
       borrowedAmount,
-      entryPrice,
-      currentPrice: entryPrice,
+      entryPrice: normalizedEntryPrice,
+      currentPrice: normalizedEntryPrice,
       stopLoss,
       takeProfit,
       unrealizedPnL: 0,
       realizedPnL: 0,
-      liquidationPrice: this.calculateLiquidationPrice(side, entryPrice, leverage),
+      liquidationPrice: this.calculateLiquidationPrice(
+        normalizedSide,
+        normalizedEntryPrice,
+        normalizedLeverage
+      ),
       interestAccrued: 0,
       status: 'open',
       openedAt: Date.now(),
@@ -115,7 +136,7 @@ class MarginTradingService {
     };
 
     // Update account
-    account.balance -= collateral;
+    account.balance -= normalizedCollateral;
     account.borrowed += borrowedAmount;
     account.positions.push(positionId);
     
@@ -217,19 +238,23 @@ class MarginTradingService {
     if (!position || position.status !== 'open') {
       throw new Error('Position not found or already closed');
     }
+    const normalizedClosePrice = Number(closePrice);
+    if (!Number.isFinite(normalizedClosePrice) || normalizedClosePrice <= 0) {
+      throw new Error('Close price must be a positive number');
+    }
 
     const account = this.marginAccounts.get(position.userId);
     
     // Calculate final PnL
     const priceDiff = position.side === 'long'
-      ? closePrice - position.entryPrice
-      : position.entryPrice - closePrice;
+      ? normalizedClosePrice - position.entryPrice
+      : position.entryPrice - normalizedClosePrice;
     
     const grossPnL = (priceDiff / position.entryPrice) * position.positionSize;
     const netPnL = grossPnL - position.interestAccrued;
 
     // Update position
-    position.currentPrice = closePrice;
+    position.currentPrice = normalizedClosePrice;
     position.realizedPnL = netPnL;
     position.status = 'closed';
     position.closedAt = Date.now();

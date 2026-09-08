@@ -1,4 +1,3 @@
-const http = require("http");
 const { Server } = require("socket.io");
 
 /**
@@ -7,14 +6,31 @@ const { Server } = require("socket.io");
  */
 
 class WebSocketService {
-  constructor(httpServer) {
+  constructor(httpServer, options = {}) {
+    this.authenticate = options.authenticate;
     this.io = new Server(httpServer, {
       cors: {
-        origin: "*",
+        origin: options.corsOrigin || false,
         methods: ["GET", "POST"]
       }
     });
     this.connectedClients = new Map();
+    this.io.use(async (socket, next) => {
+      try {
+        const token = String(socket.handshake.auth?.token || "");
+        if (!token || typeof this.authenticate !== "function") {
+          throw new Error("Authentication required");
+        }
+        const user = await this.authenticate(token);
+        if (!user?.id) {
+          throw new Error("Invalid token user");
+        }
+        socket.data.user = user;
+        next();
+      } catch {
+        next(new Error("Authentication failed"));
+      }
+    });
     this.setupEventHandlers();
   }
 
@@ -24,15 +40,14 @@ class WebSocketService {
   setupEventHandlers() {
     this.io.on("connection", (socket) => {
       console.log(`Client connected: ${socket.id}`);
+      const userId = socket.data.user.id;
       this.connectedClients.set(socket.id, {
         socket,
-        userId: null,
+        userId,
         subscriptions: new Set()
       });
-
-      socket.on("authenticate", (data) => {
-        this.handleAuthentication(socket, data);
-      });
+      socket.join(`user:${userId}`);
+      socket.emit("authenticated", { success: true, userId });
 
       socket.on("subscribe", (data) => {
         this.handleSubscription(socket, data);
@@ -53,20 +68,8 @@ class WebSocketService {
     });
   }
 
-  /**
-   * Handle client authentication
-   * @param {object} socket - Socket instance
-   * @param {object} data - Authentication data
-   */
-  handleAuthentication(socket, data) {
-    const client = this.connectedClients.get(socket.id);
-    if (client && data.userId) {
-      client.userId = data.userId;
-      socket.emit("authenticated", { success: true, userId: data.userId });
-      console.log(`Client ${socket.id} authenticated as user ${data.userId}`);
-    } else {
-      socket.emit("authenticated", { success: false });
-    }
+  isAllowedChannel(channel) {
+    return channel === "market" || /^price:[A-Z0-9_-]{2,15}$/.test(channel);
   }
 
   /**
@@ -76,12 +79,15 @@ class WebSocketService {
    */
   handleSubscription(socket, data) {
     const client = this.connectedClients.get(socket.id);
-    if (client && data.channel) {
-      client.subscriptions.add(data.channel);
-      socket.join(data.channel);
-      socket.emit("subscribed", { channel: data.channel });
-      console.log(`Client ${socket.id} subscribed to ${data.channel}`);
+    const channel = String(data?.channel || "");
+    if (!client || !this.isAllowedChannel(channel)) {
+      socket.emit("subscriptionError", { error: "Unsupported channel" });
+      return;
     }
+    client.subscriptions.add(channel);
+    socket.join(channel);
+    socket.emit("subscribed", { channel });
+    console.log(`Client ${socket.id} subscribed to ${channel}`);
   }
 
   /**
@@ -91,11 +97,12 @@ class WebSocketService {
    */
   handleUnsubscription(socket, data) {
     const client = this.connectedClients.get(socket.id);
-    if (client && data.channel) {
-      client.subscriptions.delete(data.channel);
-      socket.leave(data.channel);
-      socket.emit("unsubscribed", { channel: data.channel });
-      console.log(`Client ${socket.id} unsubscribed from ${data.channel}`);
+    const channel = String(data?.channel || "");
+    if (client && this.isAllowedChannel(channel)) {
+      client.subscriptions.delete(channel);
+      socket.leave(channel);
+      socket.emit("unsubscribed", { channel });
+      console.log(`Client ${socket.id} unsubscribed from ${channel}`);
     }
   }
 
