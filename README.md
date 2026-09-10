@@ -48,6 +48,14 @@ For hot reload during development:
 npm run dev
 ```
 
+## Build
+
+Compile the included smart contracts with the pinned local Solidity compiler:
+
+```bash
+npm run build
+```
+
 ## Testing
 
 ```bash
