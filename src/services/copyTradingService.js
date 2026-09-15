@@ -237,10 +237,7 @@ class CopyTradingService {
       symbol,
       action,        // 'buy' | 'sell' | 'close'
       price,
-      amount,
-      stopLoss,
-      takeProfit,
-      positionId
+      amount
     } = trade;
 
     // Store trade signal

@@ -168,7 +168,7 @@ class WalletService {
         privateKey: account.privateKey,
         type: "tron",
       };
-    } catch (error) {
+    } catch {
       // Fallback: Generate random private key and derive address
       const crypto = require("crypto");
       const privateKey = crypto.randomBytes(32).toString("hex");

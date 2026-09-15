@@ -82,7 +82,7 @@ class P2PTradingService {
     const { type, crypto, fiat, minPrice, maxPrice, paymentMethod } = filters;
     
     const orders = [];
-    for (const [orderId, order] of this.orders.entries()) {
+    for (const order of this.orders.values()) {
       if (order.status !== 'active' || order.availableAmount <= 0) continue;
 
       // Apply filters
@@ -116,7 +116,7 @@ class P2PTradingService {
    */
   getUserOrders(userId, status = null) {
     const orders = [];
-    for (const [orderId, order] of this.orders.entries()) {
+    for (const order of this.orders.values()) {
       if (order.userId === userId) {
         if (status === null || order.status === status) {
           orders.push(order);
@@ -476,7 +476,7 @@ class P2PTradingService {
   /**
    * Get user trades
    */
-  getUserTrades(userId, status = null) {
+  getUserTrades(userId, _status = null) {
     const trades = [];
     // In production, query database for trades where buyerId or sellerId = userId
     return trades;

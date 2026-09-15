@@ -494,7 +494,7 @@ class MetaTraderService {
     }
 
     try {
-      const response = await this.client.get("/ping");
+      await this.client.get("/ping");
       return {
         success: true,
         connected: true,

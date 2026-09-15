@@ -199,7 +199,7 @@ class BinanceApiService {
   /**
    * Calculate position liquidation price
    */
-  calculateLiquidationPrice(entryPrice, quantity, collateral, leverage) {
+  calculateLiquidationPrice(entryPrice, quantity, collateral, _leverage) {
     const notional = quantity * entryPrice;
     const borrowedAmount = notional - collateral;
     const liquidationThreshold = this.marginConfig.liquidationThreshold;

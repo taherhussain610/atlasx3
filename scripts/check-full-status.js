@@ -1,5 +1,4 @@
 const axios = require('axios');
-const chalk = require('chalk');
 
 const BASE_URL = 'http://localhost:4000';
 
@@ -19,7 +18,7 @@ async function checkApplicationStatus() {
     const response = await axios.get(`${BASE_URL}/api/health`);
     results.server = response.status === 200;
     console.log('✅ Server Running:', BASE_URL);
-  } catch (error) {
+  } catch {
     console.log('❌ Server Not Running');
     return results;
   }
@@ -71,7 +70,7 @@ async function checkApplicationStatus() {
       console.log(`  ✅ ${endpoint.name}`);
       results.apis++;
       results.features.push(endpoint.name);
-    } catch (error) {
+    } catch {
       console.log(`  ⚠️  ${endpoint.name}`);
     }
   }

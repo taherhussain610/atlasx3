@@ -35,6 +35,7 @@ const CopyTradingService = require("./services/copyTradingService");
 const PredictionMarketsService = require("./services/predictionMarketsService");
 const APIKeysService = require("./services/apiKeysService");
 const MetaTraderService = require("./services/metaTraderService");
+const HostingerService = require("./services/hostingerService");
 const PaymentGatewayService = require("./services/paymentGatewayService");
 const PaymentTerminalService = require("./services/paymentTerminalService");
 const AssistantService = require("./services/assistantService");
@@ -811,6 +812,7 @@ const copyTradingService = new CopyTradingService();
 const predictionMarketsService = new PredictionMarketsService();
 const apiKeysService = new APIKeysService();
 const metaTraderService = new MetaTraderService();
+const hostingerService = new HostingerService();
 const paymentGateway = new PaymentGatewayService({
   quoteProvider: fetchTrxPaymentQuote,
   tronDepositAddress: TRON_DEPOSIT_ADDRESS,
@@ -1587,7 +1589,8 @@ async function processExchangeOrders(userId) {
   };
 }
 
-function computeDexRouteExecution(userId, quote) {
+// Currently unwired; kept for upcoming DEX execution endpoint
+function _computeDexRouteExecution(userId, quote) {
   const amountAtomic = parseStoredAtomic(quote.amountInAtomic || quote.amountIn);
   if (!amountAtomic || !Array.isArray(quote.hops) || quote.hops.length === 0) {
     throw new Error("DEX route is not available");
@@ -1772,7 +1775,7 @@ function auth(req, res, next) {
     }
     req.user = user;
     return next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
@@ -5495,7 +5498,7 @@ app.post("/api/wallet/validate-mnemonic", (req, res) => {
     const { mnemonic } = req.body;
     const isValid = WalletService.validateMnemonic(mnemonic);
     res.json({ valid: isValid });
-  } catch (error) {
+  } catch {
     res.json({ valid: false });
   }
 });
@@ -5634,7 +5637,7 @@ app.post("/api/solana/validate-address", (req, res) => {
     const { address } = req.body;
     const isValid = solanaService.isValidAddress(address);
     res.json({ address, valid: isValid });
-  } catch (error) {
+  } catch {
     res.json({ address: req.body.address, valid: false });
   }
 });
@@ -5709,7 +5712,7 @@ app.post("/api/tron/validate-address", (req, res) => {
     const { address } = req.body;
     const isValid = tronService.isValidAddress(address);
     res.json({ address, valid: isValid });
-  } catch (error) {
+  } catch {
     res.json({ address: req.body.address, valid: false });
   }
 });
@@ -8284,6 +8287,46 @@ app.get("/api/metatrader/stats", auth, async (req, res) => {
     console.error("Error getting trading stats:", error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// ============================================
+// HOSTINGER API ENDPOINTS (VPS / Domains / DNS)
+// ============================================
+
+app.get("/api/hostinger/status", auth, async (req, res) => {
+  res.json(await hostingerService.checkConnection());
+});
+
+app.get("/api/hostinger/domains", auth, async (req, res) => {
+  res.json(await hostingerService.listDomains());
+});
+
+app.get("/api/hostinger/dns/:domain", auth, async (req, res) => {
+  res.json(await hostingerService.getDnsRecords(req.params.domain));
+});
+
+app.put("/api/hostinger/dns/:domain", auth, async (req, res) => {
+  const { zone, overwrite } = req.body || {};
+  if (!Array.isArray(zone) || zone.length === 0) {
+    return res.status(400).json({ success: false, error: "Body must include a non-empty 'zone' array" });
+  }
+  res.json(await hostingerService.updateDnsRecords(req.params.domain, zone, overwrite !== false));
+});
+
+app.get("/api/hostinger/vps", auth, async (req, res) => {
+  res.json(await hostingerService.listVirtualMachines());
+});
+
+app.get("/api/hostinger/vps/:vmId", auth, async (req, res) => {
+  res.json(await hostingerService.getVirtualMachine(req.params.vmId));
+});
+
+app.post("/api/hostinger/vps/:vmId/:action", auth, async (req, res) => {
+  res.json(await hostingerService.setVirtualMachineState(req.params.vmId, req.params.action));
+});
+
+app.get("/api/hostinger/subscriptions", auth, async (req, res) => {
+  res.json(await hostingerService.listSubscriptions());
 });
 
 // ============================================

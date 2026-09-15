@@ -3996,20 +3996,6 @@ async function loadHardhatAssets() {
   renderHardhatAssets();
 }
 
-async function loadHardhatAccounts() {
-  try {
-    const result = await apiCall("/api/hardhat/accounts", {
-      key: "hardhat-accounts",
-    });
-    state.dashboard.hardhatAccounts =
-      result.accountDetails || result.accounts || result.data || result || [];
-  } catch {
-    state.dashboard.hardhatAccounts = [];
-  }
-
-  renderHardhatAccounts();
-}
-
 
 async function loadMarketPrices() {
   try {
@@ -4407,10 +4393,6 @@ function followTraderLocally(traderId) {
   renderFollowingTraders();
   renderMetrics();
   showToast(`Now following ${id}`);
-}
-
-function getFuturesDirection() {
-  return state.futuresDirection || "Long";
 }
 
 function setFuturesDirection(direction) {

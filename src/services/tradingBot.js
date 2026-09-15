@@ -1,5 +1,4 @@
 const TechnicalIndicators = require('./technicalIndicators');
-const axios = require('axios');
 
 /**
  * AI Trading Bot Service

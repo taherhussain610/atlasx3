@@ -191,7 +191,7 @@ class APIKeysService {
 
     for (const keyId of keyIds) {
       // Find key by keyId
-      for (const [apiKey, keyData] of this.apiKeys.entries()) {
+      for (const keyData of this.apiKeys.values()) {
         if (keyData.keyId === keyId) {
           keys.push({
             ...keyData,
@@ -226,12 +226,10 @@ class APIKeysService {
   updateAPIKey(userId, keyId, updates) {
     // Find the key
     let targetKey = null;
-    let targetKeyString = null;
 
-    for (const [apiKey, keyData] of this.apiKeys.entries()) {
+    for (const keyData of this.apiKeys.values()) {
       if (keyData.keyId === keyId && keyData.userId === userId) {
         targetKey = keyData;
-        targetKeyString = apiKey;
         break;
       }
     }
@@ -308,7 +306,7 @@ class APIKeysService {
       if (!usage) continue;
 
       // Find key to check if active
-      for (const [apiKey, keyData] of this.apiKeys.entries()) {
+      for (const keyData of this.apiKeys.values()) {
         if (keyData.keyId === keyId) {
           if (keyData.isActive) stats.activeKeys += 1;
           break;
@@ -327,7 +325,7 @@ class APIKeysService {
   /**
    * Generate webhook secret
    */
-  generateWebhookSecret(userId) {
+  generateWebhookSecret(_userId) {
     const secret = 'whsec_' + crypto.randomBytes(32).toString('hex');
     return secret;
   }
