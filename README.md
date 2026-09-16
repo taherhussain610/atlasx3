@@ -31,8 +31,23 @@ Then edit `.env` with your API keys and network settings.
 | `SOLANA_RPC_URL` | Solana RPC endpoint used for Solana wallet and balance operations. |
 | `BSC_RPC_URL` | BNB Smart Chain RPC endpoint for BSC balance and chain calls. |
 | `TRON_NETWORK` | TRON target network selection for TRON workflows. |
+| `GASFREE_ENABLED` | Enable GasFree TRON integration (`false` by default). |
+| `GASFREE_BASE_URL` | Base URL for GasFree API requests. |
+| `GASFREE_TRON_MAINNET_API_KEY` | Mainnet API key for GasFree TRON requests. |
+| `GASFREE_TRON_MAINNET_API_SECRET` | Mainnet API secret for GasFree TRON request signing. |
+| `GASFREE_TRON_TESTNET_API_KEY` | Testnet API key for GasFree TRON requests. |
+| `GASFREE_TRON_TESTNET_API_SECRET` | Testnet API secret for GasFree TRON request signing. |
 | `SMTP_HOST` | SMTP host for outbound email and onboarding messages. |
 | `METATRADER_API_URL` | MetaTrader bridge endpoint for account and order workflows. |
+
+### GasFree TRON Setup
+
+- Keep `GASFREE_ENABLED=false` to preserve existing TRON behavior.
+- Set `GASFREE_ENABLED=true` only after all GasFree variables above are configured.
+- When enabled:
+  - `TRON_NETWORK=mainnet` uses GasFree `mainnet` credentials.
+  - `TRON_NETWORK=shasta` or `TRON_NETWORK=nile` uses GasFree `testnet` credentials.
+- The server will fail fast on startup with a clear error if GasFree is enabled and required GasFree credentials are missing.
 
 ## Running
 
