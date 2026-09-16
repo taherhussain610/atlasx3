@@ -6,6 +6,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
 const axios = require("axios");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -153,6 +154,12 @@ const SUPPORTED = {
 
 const SUPPORTED_CODES = Object.keys(SUPPORTED);
 const ATOMIC_SCALE = 100000000n;
+const gasFreeRouteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 if (NODE_ENV === "production" && JWT_SECRET === "dev-secret-change-me") {
   throw new Error("JWT_SECRET must be set to a strong value in production.");
@@ -4173,11 +4180,6 @@ app.get("/api/bsc/config", auth, (_req, res) => {
 
 app.get("/api/tron/config", auth, (_req, res) => {
   const networkInfo = tronService.getNetworkInfo();
-  const gasFreeNetwork = resolveGasFreeNetwork(networkInfo.network);
-  const gasFreeCredentials =
-    GASFREE_CONFIG.credentials && GASFREE_CONFIG.credentials[gasFreeNetwork]
-      ? GASFREE_CONFIG.credentials[gasFreeNetwork]
-      : { apiKey: "", apiSecret: "" };
   res.json({
     network: networkInfo.network,
     endpoints: networkInfo.endpoints,
@@ -4185,9 +4187,6 @@ app.get("/api/tron/config", auth, (_req, res) => {
     apiKeyPreview: networkInfo.apiKey,
     gasFree: {
       enabled: GASFREE_CONFIG.enabled,
-      baseUrl: GASFREE_CONFIG.baseUrl,
-      network: gasFreeNetwork,
-      credentialsConfigured: Boolean(gasFreeCredentials.apiKey && gasFreeCredentials.apiSecret),
     },
   });
 });
@@ -5946,17 +5945,21 @@ app.post("/api/solana/send", auth, async (req, res) => {
 
 app.post("/api/tron/send", auth, async (req, res) => {
   try {
-    const { privateKey, to, amount, useGasFree, network } = req.body;
-
-    if (!privateKey || !to || !amount) {
-      return res.status(400).json({ error: "Missing required fields: privateKey, to, amount" });
-    }
+    const { privateKey, to, amount, useGasFree, network, signedTransaction } = req.body;
 
     if (useGasFree && gasFreeClient) {
-      const gasFreeNetwork = network || resolveGasFreeNetwork(TRON_NETWORK);
-      const signedTransaction = await tronService.createSignedTrxTransaction(privateKey, to, amount);
+      const gasFreeNetwork = resolveGasFreeNetwork(network || TRON_NETWORK);
+      let preparedSignedTransaction = signedTransaction;
+      if (!preparedSignedTransaction) {
+        if (!privateKey || !to || !amount) {
+          return res.status(400).json({
+            error: "Missing required fields: signedTransaction, or privateKey with to and amount",
+          });
+        }
+        preparedSignedTransaction = await tronService.createSignedTrxTransaction(privateKey, to, amount);
+      }
       const result = await gasFreeClient.submitTransaction(
-        { signedTransaction, to, amount },
+        { signedTransaction: preparedSignedTransaction, to, amount },
         gasFreeNetwork
       );
 
@@ -5968,6 +5971,10 @@ app.post("/api/tron/send", auth, async (req, res) => {
         gasFreeNetwork,
         result,
       });
+    }
+
+    if (!privateKey || !to || !amount) {
+      return res.status(400).json({ error: "Missing required fields: privateKey, to, amount" });
     }
 
     const result = await tronService.sendTrx(privateKey, to, amount);
@@ -5990,18 +5997,18 @@ app.post("/api/tron/send", auth, async (req, res) => {
   }
 });
 
-app.post("/api/tron/gasfree/estimate", auth, async (req, res) => {
+app.post("/api/tron/gasfree/estimate", gasFreeRouteLimiter, auth, async (req, res) => {
   if (!gasFreeClient) {
     return res.status(503).json({ error: "GasFree is disabled or not configured." });
   }
 
   try {
     const { network, payload } = req.body;
-    if (!payload || typeof payload !== "object") {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
       return res.status(400).json({ error: "payload object is required" });
     }
 
-    const gasFreeNetwork = network || resolveGasFreeNetwork(TRON_NETWORK);
+    const gasFreeNetwork = resolveGasFreeNetwork(network || TRON_NETWORK);
     const estimate = await gasFreeClient.estimateTransaction(payload, gasFreeNetwork);
     return res.json({
       success: true,
@@ -6021,18 +6028,18 @@ app.post("/api/tron/gasfree/estimate", auth, async (req, res) => {
   }
 });
 
-app.post("/api/tron/gasfree/sponsor", auth, async (req, res) => {
+app.post("/api/tron/gasfree/sponsor", gasFreeRouteLimiter, auth, async (req, res) => {
   if (!gasFreeClient) {
     return res.status(503).json({ error: "GasFree is disabled or not configured." });
   }
 
   try {
     const { network, payload } = req.body;
-    if (!payload || typeof payload !== "object") {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
       return res.status(400).json({ error: "payload object is required" });
     }
 
-    const gasFreeNetwork = network || resolveGasFreeNetwork(TRON_NETWORK);
+    const gasFreeNetwork = resolveGasFreeNetwork(network || TRON_NETWORK);
     const sponsored = await gasFreeClient.sponsorTransaction(payload, gasFreeNetwork);
     return res.json({
       success: true,

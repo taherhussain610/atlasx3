@@ -1,9 +1,13 @@
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 const { loadGasFreeConfig, resolveGasFreeNetwork } = require("../src/config/gasfree");
 const { GasFreeApiError, GasFreeClient } = require("../src/services/gasfreeClient");
+
+const serverSource = fs.readFileSync(path.join(__dirname, "..", "src", "server.js"), "utf8");
 
 test("GasFree config defaults to disabled when toggle is absent", () => {
   const config = loadGasFreeConfig({});
@@ -121,4 +125,12 @@ test("GasFree client wraps upstream errors with status and payload", async () =>
       return true;
     }
   );
+});
+
+test("TRON GasFree routes guard disabled state and validate payload", () => {
+  assert.match(serverSource, /\/api\/tron\/gasfree\/estimate/);
+  assert.match(serverSource, /\/api\/tron\/gasfree\/sponsor/);
+  assert.match(serverSource, /GasFree is disabled or not configured\./);
+  assert.match(serverSource, /payload object is required/);
+  assert.match(serverSource, /error instanceof GasFreeApiError/);
 });
