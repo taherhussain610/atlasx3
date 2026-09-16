@@ -70,6 +70,7 @@ npm run lint
 - Margin/demo trading, token swap history, and P2P trading workflows
 - Copy trading, prediction markets, MetaTrader operations, and assistant tooling
 - DEX token and liquidity pool visibility alongside wallet, API key, and payment terminal tools
+- Live external EVM DEX mode with non-custodial Uniswap V2/V3 transaction preparation (see `LIVE_EVM_DEX_INTEGRATION.md`)
 - Hardhat, ERC-1155, and blockchain operations panels for smart contract experimentation
 
 ## Blockchain Networks

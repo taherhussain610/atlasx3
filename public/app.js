@@ -71,6 +71,8 @@ const state = {
     newsItems: [],
     dexTokens: [],
     dexPools: [],
+    liveDexSupport: null,
+    liveDexPreparedSwap: null,
     cryptoSearchResults: [],
     swapHistory: [],
     mtAccount: null,
@@ -3085,6 +3087,14 @@ function renderDexPools() {
     .join("");
 }
 
+function updateDexModeView() {
+  const mode = String(document.getElementById("dexModeSelect")?.value || "internal");
+  const livePanel = document.getElementById("liveDexPanel");
+  if (livePanel) {
+    livePanel.hidden = mode !== "live";
+  }
+}
+
 function renderCryptoSearchResults(query = "") {
   const panel = document.getElementById("cryptoSearchResults");
   if (!panel) {
@@ -3977,6 +3987,167 @@ async function loadDexPools() {
   renderDexPools();
 }
 
+function getLiveDexFormPayload() {
+  const chainId = Number(document.getElementById("liveDexChainId")?.value || "1");
+  const protocol = String(document.getElementById("liveDexProtocol")?.value || "uniswap_v2").trim();
+  const walletAddress = String(document.getElementById("liveDexWalletAddress")?.value || "").trim();
+  const tokenIn = String(document.getElementById("liveDexTokenIn")?.value || "").trim();
+  const tokenOut = String(document.getElementById("liveDexTokenOut")?.value || "").trim();
+  const amountIn = String(document.getElementById("liveDexAmountIn")?.value || "").trim();
+  const minimumAmountOut = String(document.getElementById("liveDexMinAmountOut")?.value || "").trim();
+  const feeTier = Number(document.getElementById("liveDexFeeTier")?.value || "3000");
+  const slippageBps = Number(document.getElementById("liveDexSlippageBps")?.value || "100");
+  const deadlineInput = Number(document.getElementById("liveDexDeadline")?.value || "0");
+  const deadline = Number.isFinite(deadlineInput) && deadlineInput > 0
+    ? Math.floor(deadlineInput)
+    : Math.floor(Date.now() / 1000) + 20 * 60;
+
+  return {
+    chainId,
+    protocol,
+    walletAddress,
+    tokenIn,
+    tokenOut,
+    amountIn,
+    minimumAmountOut,
+    feeTier,
+    slippageBps,
+    deadline,
+    tokenInDecimals: 18,
+    tokenOutDecimals: 18,
+  };
+}
+
+async function ensureEip1193Wallet() {
+  if (!window.ethereum || typeof window.ethereum.request !== "function") {
+    throw new Error("No injected EIP-1193 wallet found. Install MetaMask-compatible wallet.");
+  }
+  await window.ethereum.request({ method: "eth_requestAccounts" });
+}
+
+async function ensureWalletOnChain(chainId) {
+  await ensureEip1193Wallet();
+  const expected = `0x${Number(chainId).toString(16)}`;
+  const walletChain = await window.ethereum.request({ method: "eth_chainId" });
+  if (walletChain === expected) {
+    return;
+  }
+
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: expected }],
+    });
+  } catch (error) {
+    throw new Error(
+      `Wallet chain mismatch: expected ${chainId}, got ${walletChain}. Switch to the requested chain and retry.`,
+      { cause: error }
+    );
+  }
+}
+
+async function loadLiveDexSupport() {
+  const result = await apiCall("/api/dex/live/networks", {
+    key: "live-dex-networks",
+  });
+  state.dashboard.liveDexSupport = result;
+  renderResultPanel("liveDexResult", "Live protocol support matrix", result);
+}
+
+async function lookupLiveDexPool() {
+  const payload = getLiveDexFormPayload();
+  const query = new URLSearchParams({
+    chainId: String(payload.chainId),
+    protocol: payload.protocol,
+    tokenA: payload.tokenIn,
+    tokenB: payload.tokenOut,
+    feeTier: String(payload.feeTier),
+  });
+  const result = await apiCall(`/api/dex/live/pools?${query.toString()}`, {
+    key: "live-dex-pools",
+  });
+  renderResultPanel("liveDexResult", "Live pool lookup", result);
+}
+
+async function quoteLiveDexSwap() {
+  const payload = getLiveDexFormPayload();
+  const result = await apiCall("/api/dex/live/quote", {
+    key: "live-dex-quote",
+    method: "POST",
+    body: {
+      chainId: payload.chainId,
+      protocol: payload.protocol,
+      tokenIn: payload.tokenIn,
+      tokenOut: payload.tokenOut,
+      amountIn: payload.amountIn,
+      tokenInDecimals: payload.tokenInDecimals,
+      tokenOutDecimals: payload.tokenOutDecimals,
+      feeTier: payload.protocol === "uniswap_v3" ? payload.feeTier : undefined,
+      slippageBps: payload.slippageBps,
+    },
+  });
+  renderResultPanel("liveDexResult", "Live quote preview", result);
+
+  const quote = result?.quote;
+  if (quote?.minimumAmountOut) {
+    const minOutputNode = document.getElementById("liveDexMinAmountOut");
+    if (minOutputNode) {
+      minOutputNode.value = quote.minimumAmountOut;
+    }
+  }
+}
+
+async function prepareLiveDexSwap() {
+  const payload = getLiveDexFormPayload();
+  const result = await apiCall("/api/dex/live/prepare/swap", {
+    key: "live-dex-prepare-swap",
+    method: "POST",
+    body: {
+      chainId: payload.chainId,
+      protocol: payload.protocol,
+      walletAddress: payload.walletAddress,
+      tokenIn: payload.tokenIn,
+      tokenOut: payload.tokenOut,
+      amountIn: payload.amountIn,
+      minimumAmountOut: payload.minimumAmountOut,
+      deadline: payload.deadline,
+      feeTier: payload.protocol === "uniswap_v3" ? payload.feeTier : undefined,
+      tokenInDecimals: payload.tokenInDecimals,
+      tokenOutDecimals: payload.tokenOutDecimals,
+    },
+  });
+  state.dashboard.liveDexPreparedSwap = result?.prepared || null;
+  renderResultPanel("liveDexResult", "Prepared live swap transaction", result);
+}
+
+async function sendPreparedLiveDexSwap() {
+  const prepared = state.dashboard.liveDexPreparedSwap;
+  if (!prepared?.txRequest) {
+    throw new Error("Prepare a live swap transaction first.");
+  }
+
+  await ensureWalletOnChain(prepared.chainId);
+  await ensureEip1193Wallet();
+
+  const txHash = await window.ethereum.request({
+    method: "eth_sendTransaction",
+    params: [
+      {
+        from: prepared.txRequest.from,
+        to: prepared.txRequest.to,
+        data: prepared.txRequest.data,
+        value: prepared.txRequest.value || "0x0",
+      },
+    ],
+  });
+
+  renderResultPanel("liveDexResult", "Live swap submitted", {
+    chainId: prepared.chainId,
+    protocol: prepared.protocol,
+    txHash,
+  });
+}
+
 async function searchCrypto(query) {
   const trimmedQuery = String(query || "").trim();
   if (!trimmedQuery) {
@@ -4721,6 +4892,7 @@ function bindFormHandlers() {
   const transactionLookupForm = document.getElementById("transactionLookupForm");
   const paymentTerminalForm = document.getElementById("paymentTerminalForm");
   const themeSelect = document.getElementById("themeSelect");
+  const dexModeSelect = document.getElementById("dexModeSelect");
   const lbPeriod = document.getElementById("lbPeriod");
 
   loginForm?.addEventListener("submit", async (event) => {
@@ -4737,6 +4909,10 @@ function bindFormHandlers() {
     const payload = Object.fromEntries(new FormData(registerForm).entries());
     await registerAccount(payload);
     registerForm.reset();
+  });
+
+  dexModeSelect?.addEventListener("change", () => {
+    updateDexModeView();
   });
 
   marginCloseForm?.addEventListener("submit", async (event) => {
@@ -5201,6 +5377,46 @@ function bindGlobalHandlers() {
 
     if (action === "load-dex-pools") {
       await loadDexPools();
+      return;
+    }
+
+    if (action === "live-dex-load-support") {
+      const result = await loadLiveDexSupport().catch((error) => ({ error: error.message }));
+      if (result?.error) {
+        renderResultPanel("liveDexResult", "Live protocol support matrix", result);
+      }
+      return;
+    }
+
+    if (action === "live-dex-lookup-pool") {
+      const result = await lookupLiveDexPool().catch((error) => ({ error: error.message }));
+      if (result?.error) {
+        renderResultPanel("liveDexResult", "Live pool lookup", result);
+      }
+      return;
+    }
+
+    if (action === "live-dex-quote") {
+      const result = await quoteLiveDexSwap().catch((error) => ({ error: error.message }));
+      if (result?.error) {
+        renderResultPanel("liveDexResult", "Live quote preview", result);
+      }
+      return;
+    }
+
+    if (action === "live-dex-prepare-swap") {
+      const result = await prepareLiveDexSwap().catch((error) => ({ error: error.message }));
+      if (result?.error) {
+        renderResultPanel("liveDexResult", "Prepared live swap transaction", result);
+      }
+      return;
+    }
+
+    if (action === "live-dex-send-swap") {
+      const result = await sendPreparedLiveDexSwap().catch((error) => ({ error: error.message }));
+      if (result?.error) {
+        renderResultPanel("liveDexResult", "Live swap submitted", result);
+      }
       return;
     }
 
@@ -5947,6 +6163,7 @@ function bindGlobalHandlers() {
 async function bootstrap() {
   bindFormHandlers();
   bindGlobalHandlers();
+  updateDexModeView();
   connectWebSocket();
   appendAssistantMessage("assistant", "AtlasX assistant ready. Ask for risk summaries, on-chain status or desk workflows.");
   await loadAssistantStatus().catch(() => null);

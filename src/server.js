@@ -38,6 +38,7 @@ const MetaTraderService = require("./services/metaTraderService");
 const PaymentGatewayService = require("./services/paymentGatewayService");
 const PaymentTerminalService = require("./services/paymentTerminalService");
 const AssistantService = require("./services/assistantService");
+const { EvmDexService, DexIntegrationError } = require("./services/evmDex");
 
 // Import advanced integration services
 const BinanceApiService = require("./services/binanceApiService");
@@ -156,6 +157,7 @@ if (NODE_ENV === "production" && JWT_SECRET === "dev-secret-change-me") {
 }
 
 const hardhatService = new HardhatService({ rpcUrl: HARDHAT_RPC_URL });
+const evmDexService = new EvmDexService();
 
 // Ensure the data directory exists before opening the database
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
@@ -1718,6 +1720,21 @@ function auth(req, res, next) {
   } catch (err) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
+}
+
+function sendLiveDexError(res, error) {
+  if (error instanceof DexIntegrationError) {
+    return res.status(error.status || 400).json({
+      error: error.message,
+      code: error.code,
+      details: error.details || null,
+    });
+  }
+
+  return res.status(500).json({
+    error: "Live DEX request failed",
+    code: "LIVE_DEX_INTERNAL_ERROR",
+  });
 }
 
 let ratesCache = {
@@ -4941,6 +4958,160 @@ app.post(
       });
     } catch (err) {
       return res.status(400).json({ error: err.message });
+    }
+  }
+);
+
+app.get("/api/dex/live/networks", rateLimiters.read, auth, (_req, res) => {
+  try {
+    const support = evmDexService.getSupportMatrix();
+    return res.json({
+      mode: "live_external_pools",
+      protocols: support.protocols,
+      networks: support.networks,
+      warning:
+        "Live external pools are non-custodial. AtlasX only prepares unsigned wallet transactions.",
+    });
+  } catch (error) {
+    return sendLiveDexError(res, error);
+  }
+});
+
+app.get(
+  "/api/dex/live/pools",
+  [
+    query("chainId").isInt({ min: 1 }),
+    query("protocol").isString().trim().isLength({ min: 2, max: 64 }),
+    query("tokenA").optional().isString().trim().isLength({ min: 42, max: 42 }),
+    query("tokenB").optional().isString().trim().isLength({ min: 42, max: 42 }),
+    query("poolAddress").optional().isString().trim().isLength({ min: 42, max: 42 }),
+    query("feeTier").optional().isInt({ min: 1, max: 1000000 }),
+  ],
+  validate,
+  rateLimiters.blockchain,
+  auth,
+  async (req, res) => {
+    try {
+      const result = await evmDexService.lookupPools({
+        chainId: req.query.chainId,
+        protocol: req.query.protocol,
+        tokenA: req.query.tokenA,
+        tokenB: req.query.tokenB,
+        poolAddress: req.query.poolAddress,
+        feeTier: req.query.feeTier,
+      });
+      return res.json(result);
+    } catch (error) {
+      return sendLiveDexError(res, error);
+    }
+  }
+);
+
+app.post(
+  "/api/dex/live/quote",
+  [
+    body("chainId").isInt({ min: 1 }),
+    body("protocol").isString().trim().isLength({ min: 2, max: 64 }),
+    body("tokenIn").isString().trim().isLength({ min: 42, max: 42 }),
+    body("tokenOut").isString().trim().isLength({ min: 42, max: 42 }),
+    body("amountIn").isString().trim().isLength({ min: 1, max: 120 }),
+    body("tokenInDecimals").optional().isInt({ min: 0, max: 36 }),
+    body("tokenOutDecimals").optional().isInt({ min: 0, max: 36 }),
+    body("feeTier").optional().isInt({ min: 1, max: 1000000 }),
+    body("slippageBps").optional().isInt({ min: 0, max: 5000 }),
+    body("poolAddress").optional().isString().trim().isLength({ min: 42, max: 42 }),
+  ],
+  validate,
+  rateLimiters.blockchain,
+  auth,
+  async (req, res) => {
+    try {
+      const quote = await evmDexService.buildQuote(req.body);
+      return res.json({
+        mode: "live_external_pools",
+        quote,
+      });
+    } catch (error) {
+      return sendLiveDexError(res, error);
+    }
+  }
+);
+
+app.post(
+  "/api/dex/live/prepare/swap",
+  [
+    body("chainId").isInt({ min: 1 }),
+    body("protocol").isString().trim().isLength({ min: 2, max: 64 }),
+    body("walletAddress").isString().trim().isLength({ min: 42, max: 42 }),
+    body("tokenIn").isString().trim().isLength({ min: 42, max: 42 }),
+    body("tokenOut").isString().trim().isLength({ min: 42, max: 42 }),
+    body("amountIn").isString().trim().isLength({ min: 1, max: 120 }),
+    body("minimumAmountOut").isString().trim().isLength({ min: 1, max: 120 }),
+    body("deadline").isInt({ min: 1 }),
+    body("feeTier").optional().isInt({ min: 1, max: 1000000 }),
+    body("tokenInDecimals").optional().isInt({ min: 0, max: 36 }),
+    body("tokenOutDecimals").optional().isInt({ min: 0, max: 36 }),
+  ],
+  validate,
+  rateLimiters.trading,
+  auth,
+  (req, res) => {
+    try {
+      const prepared = evmDexService.buildSwapTx(req.body);
+      return res.json({
+        mode: "live_external_pools",
+        prepared,
+      });
+    } catch (error) {
+      return sendLiveDexError(res, error);
+    }
+  }
+);
+
+app.post(
+  "/api/dex/live/prepare/liquidity/add",
+  [
+    body("chainId").isInt({ min: 1 }),
+    body("protocol").isString().trim().isLength({ min: 2, max: 64 }),
+    body("walletAddress").isString().trim().isLength({ min: 42, max: 42 }),
+    body("deadline").isInt({ min: 1 }),
+  ],
+  validate,
+  rateLimiters.trading,
+  auth,
+  (req, res) => {
+    try {
+      const prepared = evmDexService.buildAddLiquidityTx(req.body);
+      return res.json({
+        mode: "live_external_pools",
+        prepared,
+      });
+    } catch (error) {
+      return sendLiveDexError(res, error);
+    }
+  }
+);
+
+app.post(
+  "/api/dex/live/prepare/liquidity/remove",
+  [
+    body("chainId").isInt({ min: 1 }),
+    body("protocol").isString().trim().isLength({ min: 2, max: 64 }),
+    body("walletAddress").isString().trim().isLength({ min: 42, max: 42 }),
+    body("deadline").isInt({ min: 1 }),
+  ],
+  validate,
+  rateLimiters.trading,
+  auth,
+  (req, res) => {
+    try {
+      const prepared = evmDexService.buildRemoveLiquidityTx(req.body);
+      return res.json({
+        mode: "live_external_pools",
+        prepared,
+      });
+    } catch (error) {
+      return sendLiveDexError(res, error);
     }
   }
 );
