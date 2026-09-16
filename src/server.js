@@ -4962,7 +4962,7 @@ app.post(
   }
 );
 
-app.get("/api/dex/live/networks", auth, (_req, res) => {
+app.get("/api/dex/live/networks", rateLimiters.read, auth, (_req, res) => {
   try {
     const support = evmDexService.getSupportMatrix();
     return res.json({
@@ -4988,6 +4988,7 @@ app.get(
     query("feeTier").optional().isInt({ min: 1, max: 1000000 }),
   ],
   validate,
+  rateLimiters.blockchain,
   auth,
   async (req, res) => {
     try {
@@ -5021,6 +5022,7 @@ app.post(
     body("poolAddress").optional().isString().trim().isLength({ min: 42, max: 42 }),
   ],
   validate,
+  rateLimiters.blockchain,
   auth,
   async (req, res) => {
     try {
@@ -5051,6 +5053,7 @@ app.post(
     body("tokenOutDecimals").optional().isInt({ min: 0, max: 36 }),
   ],
   validate,
+  rateLimiters.trading,
   auth,
   (req, res) => {
     try {
@@ -5074,6 +5077,7 @@ app.post(
     body("deadline").isInt({ min: 1 }),
   ],
   validate,
+  rateLimiters.trading,
   auth,
   (req, res) => {
     try {
@@ -5097,6 +5101,7 @@ app.post(
     body("deadline").isInt({ min: 1 }),
   ],
   validate,
+  rateLimiters.trading,
   auth,
   (req, res) => {
     try {
