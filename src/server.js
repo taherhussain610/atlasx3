@@ -6,6 +6,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
 const axios = require("axios");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -38,6 +39,8 @@ const MetaTraderService = require("./services/metaTraderService");
 const PaymentGatewayService = require("./services/paymentGatewayService");
 const PaymentTerminalService = require("./services/paymentTerminalService");
 const AssistantService = require("./services/assistantService");
+const { GasFreeClient, GasFreeApiError } = require("./services/gasfreeClient");
+const { loadGasFreeConfig, resolveGasFreeNetwork } = require("./config/gasfree");
 
 // Import advanced integration services
 const BinanceApiService = require("./services/binanceApiService");
@@ -139,6 +142,7 @@ const TATUM_DATA_API_URL = process.env.TATUM_DATA_API_URL || "https://api.tatum.
 const TATUM_DATA_API_KEY = process.env.TATUM_DATA_API_KEY || process.env.TATUM_API_KEY || "";
 const BSC_WALLET_CACHE_MS = Number(process.env.BSC_WALLET_CACHE_MS || 15000);
 const HARDHAT_RPC_URL = process.env.HARDHAT_RPC_URL || "http://127.0.0.1:8545";
+const GASFREE_CONFIG = loadGasFreeConfig();
 
 const SUPPORTED = {
   BTC: "bitcoin",
@@ -150,6 +154,12 @@ const SUPPORTED = {
 
 const SUPPORTED_CODES = Object.keys(SUPPORTED);
 const ATOMIC_SCALE = 100000000n;
+const gasFreeRouteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 if (NODE_ENV === "production" && JWT_SECRET === "dev-secret-change-me") {
   throw new Error("JWT_SECRET must be set to a strong value in production.");
@@ -4175,6 +4185,9 @@ app.get("/api/tron/config", auth, (_req, res) => {
     endpoints: networkInfo.endpoints,
     usingApiKey: networkInfo.apiKey !== "none",
     apiKeyPreview: networkInfo.apiKey,
+    gasFree: {
+      enabled: GASFREE_CONFIG.enabled,
+    },
   });
 });
 
@@ -5932,7 +5945,33 @@ app.post("/api/solana/send", auth, async (req, res) => {
 
 app.post("/api/tron/send", auth, async (req, res) => {
   try {
-    const { privateKey, to, amount } = req.body;
+    const { privateKey, to, amount, useGasFree, network, signedTransaction } = req.body;
+
+    if (useGasFree && gasFreeClient) {
+      const gasFreeNetwork = resolveGasFreeNetwork(network || TRON_NETWORK);
+      let preparedSignedTransaction = signedTransaction;
+      if (!preparedSignedTransaction) {
+        if (!privateKey || !to || !amount) {
+          return res.status(400).json({
+            error: "Missing required fields: signedTransaction, or privateKey with to and amount",
+          });
+        }
+        preparedSignedTransaction = await tronService.createSignedTrxTransaction(privateKey, to, amount);
+      }
+      const result = await gasFreeClient.submitTransaction(
+        { signedTransaction: preparedSignedTransaction, to, amount },
+        gasFreeNetwork
+      );
+
+      return res.json({
+        success: true,
+        txHash: result.txHash || result.txid || result.transactionHash || null,
+        network: "tron",
+        gasFree: true,
+        gasFreeNetwork,
+        result,
+      });
+    }
 
     if (!privateKey || !to || !amount) {
       return res.status(400).json({ error: "Missing required fields: privateKey, to, amount" });
@@ -5947,7 +5986,76 @@ app.post("/api/tron/send", auth, async (req, res) => {
     });
   } catch (error) {
     console.error("Error sending TRX:", error);
+    if (error instanceof GasFreeApiError) {
+      return res.status(error.statusCode || 502).json({
+        error: error.message || "GasFree request failed",
+        gasFree: true,
+        details: error.responseBody || null,
+      });
+    }
     res.status(500).json({ error: error.message || "Failed to send TRX" });
+  }
+});
+
+app.post("/api/tron/gasfree/estimate", gasFreeRouteLimiter, auth, async (req, res) => {
+  if (!gasFreeClient) {
+    return res.status(503).json({ error: "GasFree is disabled or not configured." });
+  }
+
+  try {
+    const { network, payload } = req.body;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return res.status(400).json({ error: "payload object is required" });
+    }
+
+    const gasFreeNetwork = resolveGasFreeNetwork(network || TRON_NETWORK);
+    const estimate = await gasFreeClient.estimateTransaction(payload, gasFreeNetwork);
+    return res.json({
+      success: true,
+      gasFree: true,
+      gasFreeNetwork,
+      estimate,
+    });
+  } catch (error) {
+    console.error("Error estimating GasFree TRON transaction:", error);
+    if (error instanceof GasFreeApiError) {
+      return res.status(error.statusCode || 502).json({
+        error: error.message || "GasFree estimate request failed",
+        details: error.responseBody || null,
+      });
+    }
+    return res.status(500).json({ error: error.message || "Failed to estimate GasFree transaction" });
+  }
+});
+
+app.post("/api/tron/gasfree/sponsor", gasFreeRouteLimiter, auth, async (req, res) => {
+  if (!gasFreeClient) {
+    return res.status(503).json({ error: "GasFree is disabled or not configured." });
+  }
+
+  try {
+    const { network, payload } = req.body;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return res.status(400).json({ error: "payload object is required" });
+    }
+
+    const gasFreeNetwork = resolveGasFreeNetwork(network || TRON_NETWORK);
+    const sponsored = await gasFreeClient.sponsorTransaction(payload, gasFreeNetwork);
+    return res.json({
+      success: true,
+      gasFree: true,
+      gasFreeNetwork,
+      sponsored,
+    });
+  } catch (error) {
+    console.error("Error sponsoring GasFree TRON transaction:", error);
+    if (error instanceof GasFreeApiError) {
+      return res.status(error.statusCode || 502).json({
+        error: error.message || "GasFree sponsor request failed",
+        details: error.responseBody || null,
+      });
+    }
+    return res.status(500).json({ error: error.message || "Failed to sponsor GasFree transaction" });
   }
 });
 
@@ -9994,7 +10102,7 @@ const server = http.createServer(app);
 const wsService = new WebSocketService(server);
 
 // Initialize Blockchain Services
-let ethereumService, bscService, solanaService, tronService, cryptoDataService, erc1155Service;
+let ethereumService, bscService, solanaService, tronService, cryptoDataService, erc1155Service, gasFreeClient;
 
 try {
   const ETH_RPC_URL = process.env.ETH_RPC_URL || "https://ethereum.publicnode.com";
@@ -10006,6 +10114,13 @@ try {
 
   // Initialize TRON service with network and endpoints
   tronService = new TronService(TRON_NETWORK, TRON_RPC_API_KEY, TRON_ENDPOINTS[TRON_NETWORK]);
+  if (GASFREE_CONFIG.enabled) {
+    gasFreeClient = new GasFreeClient(GASFREE_CONFIG);
+    console.log("✓ GasFree TRON integration enabled");
+  } else {
+    gasFreeClient = null;
+    console.log("• GasFree TRON integration disabled");
+  }
 
   cryptoDataService = new CryptoDataService();
 

@@ -143,14 +143,25 @@ class TronService {
    * @returns {Promise<object>} Transaction result
    */
   async sendTrx(privateKey, to, amount) {
+    const signedTx = await this.createSignedTrxTransaction(privateKey, to, amount);
+    return await this.tronWeb.trx.sendRawTransaction(signedTx);
+  }
+
+  /**
+   * Create a signed TRX transaction without broadcasting it
+   * @param {string} privateKey - Sender's private key
+   * @param {string} to - Recipient address
+   * @param {number} amount - Amount in TRX
+   * @returns {Promise<object>} Signed transaction payload
+   */
+  async createSignedTrxTransaction(privateKey, to, amount) {
     this.tronWeb.setPrivateKey(privateKey);
     const tx = await this.tronWeb.transactionBuilder.sendTrx(
       to,
       this.tronWeb.toSun(amount),
       this.tronWeb.address.fromPrivateKey(privateKey)
     );
-    const signedTx = await this.tronWeb.trx.sign(tx, privateKey);
-    return await this.tronWeb.trx.sendRawTransaction(signedTx);
+    return await this.tronWeb.trx.sign(tx, privateKey);
   }
 
   /**
