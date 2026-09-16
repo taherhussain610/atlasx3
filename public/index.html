@@ -1200,11 +1200,22 @@
 
         <section class="dashboard-section" id="dexPanel">
           <div class="grid">
+            <div class="panel span-12">
+              <h3>DEX Mode</h3>
+              <p class="meta">Choose between AtlasX internal AMM (simulated) and live external wallet-driven protocol integrations.</p>
+              <label>
+                Execution Mode
+                <select id="dexModeSelect">
+                  <option value="internal" selected>AtlasX internal AMM</option>
+                  <option value="live">Live external pools (wallet required)</option>
+                </select>
+              </label>
+            </div>
             <div class="table-card span-6">
               <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <div>
                   <h3>DEX Tokens</h3>
-                  <p class="meta">Inspect available assets surfaced by the internal DEX service.</p>
+                  <p class="meta">Inspect assets surfaced by the AtlasX internal AMM service.</p>
                 </div>
                 <button type="button" data-action="load-dex-tokens">Load DEX Tokens</button>
               </div>
@@ -1224,7 +1235,7 @@
               <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <div>
                   <h3>Liquidity Pools</h3>
-                  <p class="meta">Load pool metrics and fee tiers published by the DEX backend.</p>
+                  <p class="meta">Load pool metrics and fee tiers from the AtlasX internal AMM backend.</p>
                 </div>
                 <button type="button" data-action="load-dex-pools">Load Liquidity Pools</button>
               </div>
@@ -1239,6 +1250,73 @@
                 </thead>
                 <tbody id="dexPoolsBody"></tbody>
               </table>
+            </div>
+            <div class="panel span-12" id="liveDexPanel">
+              <h3>Live External Pools (Non-Custodial Wallet Flow)</h3>
+              <p class="meta">Uniswap V2/V3 and configured V4/Infinity adapters prepare unsigned transaction requests for your EIP-1193 wallet.</p>
+              <div class="field-grid">
+                <label>
+                  Chain
+                  <select id="liveDexChainId">
+                    <option value="1">Ethereum Mainnet (1)</option>
+                    <option value="11155111">Sepolia (11155111)</option>
+                    <option value="56">BSC Mainnet (56)</option>
+                    <option value="97">BSC Testnet (97)</option>
+                    <option value="137">Polygon (137)</option>
+                    <option value="8453">Base (8453)</option>
+                    <option value="42161">Arbitrum (42161)</option>
+                  </select>
+                </label>
+                <label>
+                  Protocol
+                  <select id="liveDexProtocol">
+                    <option value="uniswap_v2">Uniswap V2</option>
+                    <option value="uniswap_v3">Uniswap V3</option>
+                    <option value="uniswap_v4">Uniswap V4</option>
+                    <option value="pancakeswap_infinity">PancakeSwap Infinity</option>
+                  </select>
+                </label>
+                <label>
+                  Wallet
+                  <input id="liveDexWalletAddress" type="text" placeholder="0x..." />
+                </label>
+                <label>
+                  Token In
+                  <input id="liveDexTokenIn" type="text" placeholder="0x..." />
+                </label>
+                <label>
+                  Token Out
+                  <input id="liveDexTokenOut" type="text" placeholder="0x..." />
+                </label>
+                <label>
+                  Amount In
+                  <input id="liveDexAmountIn" type="text" value="0.01" />
+                </label>
+                <label>
+                  Min Amount Out
+                  <input id="liveDexMinAmountOut" type="text" value="0" />
+                </label>
+                <label>
+                  Fee Tier (V3)
+                  <input id="liveDexFeeTier" type="number" value="3000" />
+                </label>
+                <label>
+                  Slippage Bps
+                  <input id="liveDexSlippageBps" type="number" value="100" />
+                </label>
+                <label>
+                  Deadline (unix seconds)
+                  <input id="liveDexDeadline" type="number" placeholder="Auto +20m if empty" />
+                </label>
+              </div>
+              <div class="button-row" style="margin-top: 10px;">
+                <button type="button" data-action="live-dex-load-support">Load Live Support Matrix</button>
+                <button type="button" class="secondary" data-action="live-dex-lookup-pool">Lookup Pool</button>
+                <button type="button" class="secondary" data-action="live-dex-quote">Quote Live Route</button>
+                <button type="button" class="secondary" data-action="live-dex-prepare-swap">Prepare Swap Tx</button>
+                <button type="button" class="secondary" data-action="live-dex-send-swap">Send Prepared Tx</button>
+              </div>
+              <div class="assistant-log" id="liveDexResult"></div>
             </div>
           </div>
         </section>
