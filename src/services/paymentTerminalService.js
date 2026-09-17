@@ -359,7 +359,7 @@ class PaymentTerminalService extends EventEmitter {
       switch (paymentMethod) {
         case "CHIP": {
           // Use protocols 101.1, 101.2, 101.3
-          const chipRead = await this.protocol_101_1_ChipCardRead({
+          await this.protocol_101_1_ChipCardRead({
             cardNumber,
             cardholderName,
             expiryDate,

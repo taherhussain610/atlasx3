@@ -174,7 +174,8 @@ class TechnicalIndicators {
       const highest = Math.max(...highSlice);
       const lowest = Math.min(...lowSlice);
       
-      const k = ((closes[i] - lowest) / (highest - lowest)) * 100;
+      const range = highest - lowest;
+      const k = range === 0 ? 0 : ((closes[i] - lowest) / range) * 100;
       stochastic.push(k);
     }
     

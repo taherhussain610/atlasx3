@@ -1,17 +1,17 @@
 #!/bin/bash
-# Deployment script for erc.dog
-# Crypto Exchange Application with ERC-1155 Support
+# Deployment script for atlasx.online
+# ATLASX3 application with ERC-1155 support
 
 set -e  # Exit on error
 
-echo "🚀 Deploying Crypto Exchange to erc.dog"
+echo "🚀 Deploying ATLASX3 to atlasx.online"
 echo "============================================================"
 
 # Configuration
-APP_DIR="/var/www/crypto-exchange"
-APP_NAME="crypto-exchange"
-NGINX_SITE="crypto-exchange"
-DOMAIN="erc.dog"
+APP_DIR="/var/www/atlasx3"
+APP_NAME="atlasx3"
+NGINX_SITE="atlasx3"
+DOMAIN="atlasx.online"
 
 # Colors
 GREEN='\033[0;32m'
@@ -92,16 +92,20 @@ echo ""
 echo "Step 3: Copying application files..."
 echo "--------------------------------------"
 
-# Copy files (modify source path as needed)
-SOURCE_DIR="D:/crypto/crypto-exchange-app"
-if [ -d "$SOURCE_DIR" ]; then
+# Copy files from this checkout
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ ! -f "$SOURCE_DIR/package.json" ]; then
+    print_error "Source checkout is missing package.json: $SOURCE_DIR"
+    exit 1
+fi
+if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
     # Using rsync for better copying
     rsync -av --exclude 'node_modules' --exclude '.git' \
           --exclude 'logs/*' --exclude 'data/*.db' \
           "$SOURCE_DIR/" "$APP_DIR/"
     print_success "Application files copied"
 else
-    print_warning "Source directory not found. Please copy files manually to $APP_DIR"
+    print_success "Application is already running from $APP_DIR"
 fi
 
 echo ""
@@ -244,6 +248,6 @@ echo "  • View logs: pm2 logs $APP_NAME"
 echo "  • Restart: pm2 restart $APP_NAME"
 echo "  • Stop: pm2 stop $APP_NAME"
 echo "  • Status: pm2 status"
-echo "  • Nginx logs: sudo tail -f /var/log/nginx/crypto-exchange-error.log"
+echo "  • Nginx logs: sudo tail -f /var/log/nginx/atlasx3-error.log"
 echo ""
 print_success "Deployment successful! 🚀"

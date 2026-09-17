@@ -206,7 +206,7 @@ class CryptoDataService {
    * @param {string} vsCurrency - Target currency
    * @returns {Promise<object>} Historical price data
    */
-  async getHistoricalPrice(id, date, vsCurrency = "usd") {
+  async getHistoricalPrice(id, date, _vsCurrency = "usd") {
     const response = await this.coinGeckoClient.coins.fetchHistory(id, {
       date,
       localization: false

@@ -4,7 +4,7 @@
 module.exports = {
   apps: [
     {
-      name: "crypto-exchange",
+      name: "atlasx3",
       script: "src/server.js",
       instances: 1,
       exec_mode: "fork",
@@ -57,10 +57,10 @@ module.exports = {
   deploy: {
     production: {
       user: "ubuntu",
-      host: "erc.dog",
+      host: "atlasx.online",
       ref: "origin/main",
-      repo: "git@github.com:your-username/crypto-exchange.git",
-      path: "/var/www/crypto-exchange",
+      repo: "git@github.com:taherhussain610/atlasx3.git",
+      path: "/var/www/atlasx3",
       "post-deploy": "npm install --production && pm2 reload ecosystem.config.js --env production",
       "pre-setup": "apt-get update && apt-get install -y git nodejs npm nginx",
       env: {

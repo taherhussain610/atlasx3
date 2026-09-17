@@ -135,7 +135,7 @@ class TokenSwapService {
               hops: 2
             };
           }
-        } catch (e) {
+        } catch {
           // Skip if route doesn't work
         }
       }
@@ -161,7 +161,6 @@ class TokenSwapService {
 
     // Execute the swap through each hop
     let currentAmount = amountIn;
-    let currentToken = fromToken;
 
     for (let i = 0; i < route.route.length - 1; i++) {
       const from = route.route[i];
@@ -190,7 +189,6 @@ class TokenSwapService {
       pool.volume24h += currentAmount;
 
       currentAmount = amountOut;
-      currentToken = to;
     }
 
     // Check if we met minimum output
@@ -316,7 +314,7 @@ class TokenSwapService {
     // Global statistics
     let totalSwaps = 0;
     let totalVolume = 0;
-    for (const [userId, swaps] of this.swapHistory.entries()) {
+    for (const swaps of this.swapHistory.values()) {
       totalSwaps += swaps.length;
       totalVolume += swaps.reduce((sum, s) => sum + s.amountIn, 0);
     }

@@ -3,630 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AtlasX Exchange Terminal</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #08111f;
-        --panel: #0f1b2d;
-        --panel-alt: #13233a;
-        --card: #0f1b2d;
-        --hover: #13233a;
-        --border: rgba(137, 180, 250, 0.2);
-        --text: #e6edf7;
-        --muted: #8aa2c8;
-        --accent: #39d0ff;
-        --accent-strong: #6d8cff;
-        --success: #3ddc97;
-        --warning: #ffb84d;
-        --danger: #ff6b7a;
-        --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        font-family: "Avenir Next", "Trebuchet MS", sans-serif;
-        background:
-          radial-gradient(circle at top, rgba(57, 208, 255, 0.15), transparent 30%),
-          linear-gradient(180deg, #07101b 0%, #0b1422 100%);
-        color: var(--text);
-      }
-
-      a {
-        color: inherit;
-      }
-
-      .app-shell {
-        min-height: 100vh;
-        display: grid;
-        grid-template-columns: 196px 1fr;
-      }
-
-      .sidebar {
-        padding: 12px 10px;
-        border-right: 1px solid var(--border);
-        background: rgba(7, 15, 27, 0.96);
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        overflow-y: auto;
-        scrollbar-width: thin;
-        scrollbar-color: var(--border) transparent;
-      }
-
-      .sidebar::-webkit-scrollbar { width: 4px; }
-      .sidebar::-webkit-scrollbar-track { background: transparent; }
-      .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 12px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid var(--border);
-      }
-
-      .brand-mark {
-        width: 28px;
-        height: 28px;
-        border-radius: 7px;
-        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-        display: grid;
-        place-items: center;
-        font-weight: 700;
-        font-size: 0.75rem;
-        color: #041019;
-        flex-shrink: 0;
-      }
-
-      .brand-copy h1 {
-        margin: 0;
-        font-size: 0.95rem;
-        line-height: 1.2;
-      }
-
-      .brand-copy p {
-        display: none;
-      }
-
-      .brand-copy p,
-      .section-copy,
-      .meta,
-      .empty,
-      .hint,
-      .status-chip {
-        color: var(--muted);
-      }
-
-      .sidebar nav {
-        display: grid;
-        gap: 1px;
-      }
-
-      .sidebar nav::-webkit-scrollbar { width: 4px; }
-      .sidebar nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-      .nav-group-label {
-        font-size: 0.6rem;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--muted);
-        padding: 8px 6px 2px;
-        margin: 0;
-      }
-
-      .nav-link,
-      .dashboard-tab,
-      button,
-      .pill {
-        border: 1px solid transparent;
-        border-radius: 8px;
-      }
-
-      .nav-link,
-      .dashboard-tab {
-        width: 100%;
-        min-height: 23px;
-        text-align: left;
-        padding: 2px 6px;
-        font-size: 0.7rem;
-        line-height: 1.2;
-        background: transparent;
-        color: var(--muted);
-        cursor: pointer;
-        border-radius: 6px;
-        transition: background 0.15s, color 0.15s, border-color 0.15s;
-      }
-
-      .nav-link:hover {
-        background: rgba(57, 208, 255, 0.07);
-        color: var(--text);
-      }
-
-      .nav-link.active,
-      .dashboard-tab.active {
-        border-color: rgba(57, 208, 255, 0.35);
-        border-left-color: var(--accent);
-        background: rgba(57, 208, 255, 0.12);
-        color: var(--accent);
-        font-weight: 600;
-      }
-
-      .main {
-        padding: 18px 20px;
-      }
-
-      button,
-      input,
-      select {
-        min-height: 27px;
-      }
-
-      button {
-        padding: 4px 9px;
-        font-size: 0.75rem;
-      }
-
-      .hero,
-      .panel,
-      .metric-card,
-      .table-card {
-        background: rgba(15, 27, 45, 0.9);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        box-shadow: var(--shadow);
-      }
-
-      .hero {
-        padding: 16px 20px;
-        margin-bottom: 14px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-        flex-wrap: wrap;
-      }
-
-      .hero h2 {
-        font-size: 1rem;
-        margin: 2px 0 0;
-      }
-
-      .hero > div > p { display: none; }
-
-      .hero h2,
-      .panel h3,
-      .table-card h3,
-      .section-title {
-        margin-top: 0;
-      }
-
-      .hero-actions,
-      .tab-row,
-      .grid,
-      .split,
-      .stack,
-      .button-row,
-      .metrics,
-      .toolbar {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(12, minmax(0, 1fr));
-        gap: 14px;
-      }
-
-      .span-12 { grid-column: span 12; }
-      .span-8 { grid-column: span 8; }
-      .span-6 { grid-column: span 6; }
-      .span-4 { grid-column: span 4; }
-
-      .panel,
-      .table-card {
-        padding: 16px;
-      }
-
-      .metrics {
-        margin-bottom: 14px;
-      }
-
-      .metric-card {
-        padding: 14px;
-        min-width: 140px;
-        flex: 1;
-      }
-
-      .metric-card strong {
-        display: block;
-        font-size: 1.4rem;
-        margin-top: 8px;
-      }
-
-      .dashboard-section {
-        display: none;
-      }
-
-      .dashboard-section.active {
-        display: block;
-      }
-
-      #dashboard {
-        display: block;
-      }
-
-      #toast {
-        position: fixed;
-        right: 20px;
-        bottom: 20px;
-        z-index: 20;
-        max-width: min(360px, calc(100vw - 40px));
-        padding: 12px 16px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--panel-alt);
-        color: var(--text);
-        box-shadow: var(--shadow);
-      }
-
-      #toast.positive {
-        border-color: var(--success);
-      }
-
-      #toast.warning {
-        border-color: var(--warning);
-      }
-
-      #toast.negative {
-        border-color: var(--danger);
-      }
-
-      form {
-        display: grid;
-        gap: 14px;
-      }
-
-      .field-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 14px;
-      }
-
-      label {
-        display: grid;
-        gap: 8px;
-        font-size: 0.95rem;
-      }
-
-      input,
-      select,
-      textarea,
-      button {
-        font: inherit;
-      }
-
-      input,
-      select,
-      textarea {
-        width: 100%;
-        padding: 7px 10px;
-        background: rgba(9, 18, 31, 0.9);
-        color: var(--text);
-        border: 1px solid rgba(137, 180, 250, 0.15);
-        border-radius: 8px;
-        font-size: 0.84rem;
-      }
-
-      textarea {
-        min-height: 100px;
-        resize: vertical;
-      }
-
-      button {
-        min-height: 27px;
-        padding: 4px 9px;
-        font-size: 0.75rem;
-        line-height: 1.2;
-        background: linear-gradient(135deg, rgba(57, 208, 255, 0.9), rgba(109, 140, 255, 0.9));
-        color: #06101c;
-        cursor: pointer;
-        font-weight: 600;
-        border-radius: 8px;
-        white-space: nowrap;
-        transition: opacity 0.15s;
-      }
-
-      button:hover { opacity: 0.88; }
-
-      button.secondary,
-      .pill {
-        background: rgba(19, 35, 58, 0.82);
-        color: var(--text);
-        border-color: var(--border);
-      }
-
-      button.danger {
-        background: linear-gradient(135deg, rgba(239,68,68,0.9), rgba(220,38,38,0.9));
-        color: #fff;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      th,
-      td {
-        padding: 7px 8px;
-        border-bottom: 1px solid rgba(137, 180, 250, 0.07);
-        text-align: left;
-        vertical-align: middle;
-        font-size: 0.82rem;
-      }
-
-      th {
-        font-size: 0.72rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--muted);
-        font-weight: 600;
-      }
-
-      tbody tr:hover {
-        background: rgba(57, 208, 255, 0.04);
-      }
-
-      .ticker-bar {
-        background: rgba(7, 15, 27, 0.95);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 5px 16px;
-        font-size: 0.78rem;
-        display: flex;
-        gap: 20px;
-        flex-wrap: wrap;
-        align-items: center;
-        margin-bottom: 10px;
-      }
-
-      .status-bar {
-        margin-bottom: 12px;
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        align-items: center;
-      }
-
-      .status-chip {
-        padding: 4px 10px;
-        background: rgba(19, 35, 58, 0.82);
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        font-size: 0.75rem;
-      }
-
-      .market-stat-row {
-        margin-bottom: 12px;
-      }
-
-      .market-stat-chip {
-        min-width: 180px;
-        flex: 1;
-      }
-
-      .market-stat-chip strong {
-        display: block;
-        margin-top: 6px;
-        color: var(--text);
-        font-size: 1rem;
-      }
-
-      .search-results {
-        display: grid;
-        gap: 12px;
-        margin-top: 12px;
-      }
-
-      .search-results article,
-      .summary-card {
-        background: rgba(9, 18, 31, 0.9);
-        border-radius: 16px;
-        padding: 16px;
-        border: 1px solid rgba(137, 180, 250, 0.12);
-      }
-
-      .assistant-log,
-      .feed {
-        background: rgba(9, 18, 31, 0.9);
-        border-radius: 16px;
-        padding: 16px;
-        border: 1px solid rgba(137, 180, 250, 0.12);
-        min-height: 220px;
-      }
-
-      .assistant-log article,
-      .feed article {
-        padding: 12px 0;
-        border-bottom: 1px solid rgba(137, 180, 250, 0.08);
-      }
-
-      .assistant-log article:last-child,
-      .feed article:last-child {
-        border-bottom: 0;
-      }
-
-      .news-card {
-        border-bottom: 1px solid var(--border);
-        padding: 10px 0;
-      }
-
-      .badge-bull,
-      .badge-bear,
-      .badge-neutral {
-        font-size: 11px;
-        font-weight: 600;
-      }
-
-      .badge-bull {
-        color: #22c55e;
-      }
-
-      .badge-bear {
-        color: #ef4444;
-      }
-
-      .badge-neutral {
-        color: #94a3b8;
-      }
-
-      .feed-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-      .feed-item:last-child { border-bottom: none; }
-      .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #06101c; flex-shrink: 0; }
-      .feed-content { flex: 1; min-width: 0; }
-      .feed-meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-      .badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block; }
-      .badge-bull { background: rgba(34,197,94,0.15); color: #22c55e; }
-      .badge-bear { background: rgba(239,68,68,0.15); color: #ef4444; }
-      .badge-neutral { background: rgba(148,163,184,0.15); color: #94a3b8; }
-      .quick-stats { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-      .quick-stat-pill { background: rgba(19,35,58,0.82); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
-      .quick-stat-pill .qs-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-      .quick-stat-pill .qs-val { font-weight: 700; font-size: 14px; }
-      .bot-running { color: #22c55e; font-weight: 600; font-size: 12px; }
-      .bot-paused { color: #f59e0b; font-weight: 600; font-size: 12px; }
-
-      .portfolio-stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin: 16px 0;
-      }
-
-      .chart-shell {
-        background: rgba(9, 18, 31, 0.9);
-        border: 1px solid rgba(137, 180, 250, 0.12);
-        border-radius: 16px;
-        padding: 16px;
-      }
-
-      .positive { color: var(--success); }
-      .negative { color: var(--danger); }
-      .warning { color: var(--warning); }
-      .nft-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
-      .nft-img-placeholder { width: 100%; aspect-ratio: 1; background: var(--hover); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 8px; }
-      .notif-item { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-      .notif-item:last-child { border-bottom: none; }
-      #notifDropdown { display: none; position:absolute; right:0; top:calc(100% + 8px); z-index:1000; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:12px; min-width:280px; }
-      #notifDropdown.open { display: block; }
-      .notif-bell-wrap { position: relative; display: inline-flex; align-items: center; }
-      .notif-badge { position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; border-radius: 50%; font-size: 10px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
-      .activity-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-      .activity-item:last-child { border-bottom: none; }
-      .activity-icon { font-size: 16px; width: 24px; text-align: center; }
-      .funding-row { display: flex; gap: 12px; margin-bottom: 12px; }
-      .funding-chip { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; font-size: 12px; }
-      .lb-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-      .lb-tabs button { font-size: 12px; padding: 4px 12px; }
-
-      .adv-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-      .adv-tabs button { font-size: 0.72rem; padding: 5px 12px; }
-      .adv-tabs button.secondary { background: rgba(19, 35, 58, 0.6); }
-      .adv-tabs button.active { background: linear-gradient(135deg, rgba(57, 208, 255, 0.9), rgba(109, 140, 255, 0.9)); color: #06101c; }
-      .adv-tab-panel { display: none; }
-      .adv-tab-panel.active { display: block; }
-      .adv-output {
-        margin-top: 12px;
-        padding: 12px 14px;
-        border-radius: 10px;
-        background: rgba(9, 18, 31, 0.75);
-        border: 1px solid var(--border);
-        font-size: 0.8rem;
-        max-height: 420px;
-        overflow: auto;
-      }
-      .adv-output .empty { margin: 0; }
-      .adv-metric-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed rgba(137, 180, 250, 0.12); }
-      .adv-metric-row:last-child { border-bottom: 0; }
-      .adv-metric-row span:first-child { color: var(--muted); }
-      .adv-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; }
-      .adv-badge.good { background: rgba(61, 220, 151, 0.15); color: var(--success); }
-      .adv-badge.warn { background: rgba(255, 184, 77, 0.15); color: var(--warning); }
-      .adv-badge.bad { background: rgba(255, 107, 122, 0.15); color: var(--danger); }
-      .pg-method-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
-      .pg-qr-box { background: var(--hover); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-family: monospace; font-size: 12px; word-break: break-all; text-align: center; }
-      #nftGrid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap:12px; }
-      .status-dot-online { color: #22c55e; }
-      .status-dot-offline { color: #ef4444; }
-      .status-dot-degraded { color: #f59e0b; }
-      .options-call { color: #22c55e; }
-      .options-put { color: #ef4444; }
-      .health-factor-good { color: #22c55e; font-weight: 700; }
-      .health-factor-warn { color: #f59e0b; font-weight: 700; }
-      .health-factor-bad { color: #ef4444; font-weight: 700; }
-
-      @media (max-width: 1080px) {
-        .app-shell {
-          grid-template-columns: 1fr;
-        }
-
-        .sidebar {
-          position: relative;
-          height: auto;
-          border-right: 0;
-          border-bottom: 1px solid var(--border);
-        }
-
-        .span-8,
-        .span-6,
-        .span-4 {
-          grid-column: span 12;
-        }
-      }
-
-      .rsi-high { color: #ef4444; font-weight: 600; font-size: 11px; }
-      .rsi-low { color: #22c55e; font-weight: 600; font-size: 11px; }
-      .rsi-mid { color: #94a3b8; font-size: 11px; }
-      .signal-buy { background: rgba(34,197,94,0.15); color: #22c55e; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; }
-      .signal-sell { background: rgba(239,68,68,0.15); color: #ef4444; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; }
-      .signal-hold { background: rgba(148,163,184,0.15); color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; }
-      .shortcuts-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9998; }
-      .shortcut-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; gap: 12px; }
-      .shortcut-key { background: var(--hover); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 12px; }
-      .saved-screens-grid { display: grid; gap: 10px; }
-      @media (max-width: 768px) {
-        .sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 8px; display: flex; align-items: flex-start; gap: 12px; }
-        .layout { flex-direction: column; }
-        .grid { grid-template-columns: 1fr !important; }
-        .span-4, .span-6, .span-8 { grid-column: span 1 !important; }
-        .ticker-bar { font-size: 11px; }
-        .metrics { grid-template-columns: repeat(2, 1fr); display: grid; }
-        .sidebar nav { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; }
-        .nav-link, .nav-group-label { white-space: nowrap; }
-        .nav-link { width: auto; flex: 0 0 auto; }
-        .nav-group-label { padding: 8px 4px 3px; }
-        .main { padding: 16px; }
-      }
+    <title>ATLASX3</title>
+    <link rel="stylesheet" href="styles.css" />
     </style>
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-mark">AX</div>
+          <div class="brand-mark">AX3</div>
           <div class="brand-copy">
-            <h1>AtlasX Exchange</h1>
+            <h1>ATLASX3</h1>
             <p>Trading, payments, copy trading and on-chain ops.</p>
           </div>
         </div>
-        <nav>
+        <label class="nav-search" for="navSearchInput">
+          <span class="sr-only">Find an application tool</span>
+          <input id="navSearchInput" type="search" placeholder="Find a tool…" autocomplete="off" />
+        </label>
+        <nav aria-label="Application tools">
           <p class="nav-group-label">Trading</p>
           <button class="nav-link" data-section-target="marketsPanel">📈 Markets</button>
           <button class="nav-link" data-section-target="screenerPanel">🔍 Screener</button>
@@ -672,6 +67,7 @@
           <button class="nav-link" data-section-target="assistantPanel">🤖 Assistant</button>
           <button class="nav-link" data-section-target="settingsPanel">⚙️ Settings</button>
         </nav>
+        <p class="nav-empty" id="navSearchEmpty" hidden>No matching tools.</p>
       </aside>
 
       <main class="main">
@@ -689,7 +85,7 @@
               <button type="button" id="notifBell" class="secondary" data-action="toggle-notif-panel" aria-expanded="false">🔔</button>
               <span id="notifCount" class="notif-badge">0</span>
               <div id="notifDropdown" hidden>
-                <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div class="toolbar toolbar-space-between margin-bottom-8">
                   <strong>Notifications</strong>
                   <button type="button" class="secondary" data-action="mark-notifs-read">Mark all read</button>
                 </div>
@@ -725,11 +121,11 @@
         <section class="panel span-12" id="authPanel">
           <h3>Session Access</h3>
           <div class="field-grid">
-            <div style="display: grid; gap: 12px;">
+            <div class="gap-grid-12">
               <form id="loginForm">
                 <label>
                   Email
-                  <input id="loginEmail" name="email" type="email" placeholder="trader@atlasx.dev" />
+                  <input id="loginEmail" name="email" type="email" placeholder="trader@atlasx3.dev" />
                 </label>
                 <label>
                   Password
@@ -744,7 +140,7 @@
                 <form id="registerForm">
                   <label>
                     Email
-                    <input name="email" type="email" placeholder="newuser@atlasx.dev" />
+                    <input name="email" type="email" placeholder="newuser@atlasx3.dev" />
                   </label>
                   <label>
                     Username
@@ -767,7 +163,7 @@
           </div>
         </section>
 
-        <div class="tab-row" style="margin: 10px 0 14px; gap: 4px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; scrollbar-width: none;">
+        <div class="tab-row dashboard-tabs" aria-label="Workspace sections">
           <button class="dashboard-tab" data-section-target="marketsPanel">📈 Markets</button>
           <button class="dashboard-tab" data-section-target="screenerPanel">🔍 Screener</button>
           <button class="dashboard-tab" data-section-target="portfolioPanel">💰 Portfolio</button>
@@ -811,19 +207,19 @@
         <section class="dashboard-section" id="marketsPanel">
           <div class="grid">
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Crypto Markets</h3>
                   <p class="meta">Monitor spot prices, momentum and market capitalization.</p>
                 </div>
                 <button type="button" data-action="load-market-prices">Load prices</button>
               </div>
-              <div class="toolbar" style="align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-align-center margin-bottom-12">
                 <input id="cryptoSearchInput" type="text" placeholder="Search coin (e.g. bitcoin)..." />
                 <button type="button" data-action="search-crypto">Search</button>
               </div>
               <div id="cryptoSearchResults" class="search-results"></div>
-              <div class="button-row" style="margin-bottom: 12px;">
+              <div class="button-row margin-bottom-12">
                 <button type="button" class="secondary" data-sort-col="price">Sort Price</button>
                 <button type="button" class="secondary" data-sort-col="change">Sort 24h Change</button>
                 <button type="button" class="secondary" data-sort-col="mcap">Sort Market Cap</button>
@@ -843,12 +239,12 @@
               </table>
             </div>
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h4>Exchange Price Comparison</h4>
                   <p class="meta">Compare top-of-book prices across simulated venues.</p>
                 </div>
-                <div class="toolbar" style="align-items: center;">
+                <div class="toolbar toolbar-align-center">
                   <input id="compareSymbol" type="text" placeholder="BTC" />
                   <button type="button" data-action="compare-prices">Compare</button>
                 </div>
@@ -872,7 +268,7 @@
         <section class="dashboard-section" id="screenerPanel">
           <div class="grid">
             <div class="panel span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Market Screener</h3>
                   <p class="meta">Filter high-conviction setups across sectors, cap bands and liquidity tiers.</p>
@@ -970,10 +366,10 @@
                   </select>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="load-portfolio">Load Portfolio</button>
               </div>
-              <div class="assistant-log" id="portfolioSummary" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="portfolioSummary"></div>
             </div>
             <div class="table-card span-8">
               <h3>Holdings</h3>
@@ -990,7 +386,7 @@
               </table>
             </div>
             <div class="panel span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Advanced Portfolio Analytics</h3>
                   <p class="meta">Review weighted return, strongest asset and weakest asset at a glance.</p>
@@ -998,7 +394,7 @@
                 <button type="button" data-action="export-portfolio">Export CSV</button>
               </div>
               <div class="chart-shell">
-                <canvas id="portfolioChart" height="200" style="display: block; width: 100%;">Chart rendering requires ChartJS</canvas>
+                <canvas id="portfolioChart" height="200" class="canvas-block">Chart rendering requires ChartJS</canvas>
               </div>
               <div class="portfolio-stats">
                 <div class="summary-card">
@@ -1035,10 +431,10 @@
                   <input id="rusdtPct" type="number" value="25" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="calc-rebalance">Calculate Rebalance</button>
               </div>
-              <div class="assistant-log" id="rebalanceResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="rebalanceResult"></div>
             </div>
           </div>
         </section>
@@ -1048,7 +444,7 @@
             <div class="panel span-6">
               <h3>Post a Trade Idea</h3>
               <div class="field-grid">
-                <label style="grid-column: 1 / -1;">
+                <label class="label-grid-col-full">
                   Idea
                   <textarea id="tradeIdeaText" placeholder="Share your trade idea..."></textarea>
                 </label>
@@ -1065,12 +461,12 @@
                   </select>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="post-trade-idea">Post Idea</button>
               </div>
             </div>
             <div class="table-card span-6">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <h3>Feed</h3>
                 <button type="button" class="secondary" data-action="refresh-social-feed">Refresh</button>
               </div>
@@ -1107,13 +503,13 @@
                   <input id="botInvestment" type="number" step="0.01" placeholder="2500" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="create-bot">Create Bot</button>
               </div>
-              <div class="assistant-log" id="botResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="botResult"></div>
             </div>
             <div class="table-card span-8">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <h3>Active Bots</h3>
                 <button type="button" class="secondary" data-action="refresh-bots">Refresh Bots</button>
               </div>
@@ -1138,13 +534,13 @@
         <section class="dashboard-section" id="newsPanel">
           <div class="grid">
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>News &amp; Sentiment</h3>
                   <p class="meta">Refresh the curated market headlines and filter by category.</p>
                 </div>
                 <div class="button-row">
-                  <select id="newsCategory">
+                  <select id="newsCategory" title="News category" aria-label="News category">
                     <option value="all">all</option>
                     <option value="bitcoin">bitcoin</option>
                     <option value="ethereum">ethereum</option>
@@ -1162,12 +558,12 @@
         <section class="dashboard-section" id="chartsPanel">
           <div class="grid">
             <div class="panel span-12">
-              <div class="toolbar" style="align-items: center; margin-bottom: 12px;">
-                <label style="min-width: 220px; flex: 1;">
+              <div class="toolbar toolbar-align-center margin-bottom-12">
+                <label class="label-min-width">
                   Coin ID
                   <input id="chartCoinInput" type="text" placeholder="bitcoin" value="bitcoin" />
                 </label>
-                <div class="button-row" style="margin-top: 28px;">
+                <div class="button-row margin-top-28">
                   <button type="button" data-action="load-chart">Load Chart</button>
                   <button type="button" class="secondary" data-action="load-trending">Load Trending</button>
                   <button type="button" class="secondary" data-action="load-global-stats">Load Global Stats</button>
@@ -1176,7 +572,7 @@
             </div>
             <div class="table-card span-8">
               <h3>OHLC Data</h3>
-              <div id="chartDataResult" class="assistant-log" style="min-height: 0;"></div>
+              <div id="chartDataResult" class="assistant-log min-height-0"></div>
             </div>
             <div class="panel span-4">
               <h3>Global Snapshot</h3>
@@ -1201,7 +597,7 @@
         <section class="dashboard-section" id="dexPanel">
           <div class="grid">
             <div class="table-card span-6">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>DEX Tokens</h3>
                   <p class="meta">Inspect available assets surfaced by the internal DEX service.</p>
@@ -1221,7 +617,7 @@
               </table>
             </div>
             <div class="table-card span-6">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Liquidity Pools</h3>
                   <p class="meta">Load pool metrics and fee tiers published by the DEX backend.</p>
@@ -1453,7 +849,7 @@
             </div>
             <div class="table-card span-12">
               <h3>ERC-1155 Transactions</h3>
-              <div class="assistant-log" id="erc1155Result" style="margin-bottom: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-bottom-12 min-height-0" id="erc1155Result"></div>
               <table>
                 <thead>
                   <tr>
@@ -1488,7 +884,7 @@
               </div>
             </div>
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>DeFi Dashboard</h3>
                   <p class="meta">Monitor liquidity deployments, vault yields and pending rewards.</p>
@@ -1532,7 +928,7 @@
         <section class="dashboard-section" id="multisigPanel">
           <div class="grid">
             <div class="panel span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Multi-signature Wallet</h3>
                   <p class="meta">Create threshold wallets and coordinate pending transaction approvals.</p>
@@ -1540,7 +936,7 @@
                 <button type="button" class="secondary" data-action="refresh-multisig">Refresh</button>
               </div>
               <div class="field-grid">
-                <label style="grid-column: span 2;">
+                <label class="label-grid-col-span-2">
                   Signers
                   <textarea id="multisigSigners" rows="5" placeholder="0xSignerA
 0xSignerB
@@ -1551,7 +947,7 @@
                   <input id="multisigThreshold" type="number" min="1" step="1" placeholder="2" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="create-multisig">Create MultiSig Wallet</button>
               </div>
             </div>
@@ -1592,6 +988,42 @@
 
         <section class="dashboard-section" id="walletPanel">
           <div class="grid">
+            <div class="panel span-12">
+              <h3>ATLASX3 TRX Receiving Wallet</h3>
+              <p class="meta">
+                Send native TRX only on the network shown below. Transfers require manual verification and do not automatically credit your exchange balance.
+              </p>
+              <div class="field-grid">
+                <div class="summary-card">
+                  <span class="meta">Network</span>
+                  <strong id="tronDepositNetwork">Loading…</strong>
+                </div>
+                <div class="summary-card card-grid-col-span-2">
+                  <span class="meta">Receiving address</span>
+                  <code class="wallet-address" id="tronDepositAddress" aria-live="polite">Loading…</code>
+                </div>
+              </div>
+              <div class="button-row margin-top-12">
+                <button
+                  type="button"
+                  data-action="copy-address"
+                  data-copy-label="TRX receiving address"
+                  id="copyTronDepositAddress"
+                  disabled
+                >
+                  Copy address
+                </button>
+                <a
+                  class="pill"
+                  id="tronDepositExplorer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  hidden
+                >
+                  View on TRONSCAN
+                </a>
+              </div>
+            </div>
             <div class="panel span-4">
               <h3>Generate Wallet</h3>
               <form id="walletGenerateForm">
@@ -1639,13 +1071,13 @@
               </form>
             </div>
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Wallet Results</h3>
                   <p class="meta">Generated wallets, imported mnemonics and balance checks appear here.</p>
                 </div>
               </div>
-              <div class="assistant-log" id="walletResult" style="margin-bottom: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-bottom-12 min-height-0" id="walletResult"></div>
             </div>
           </div>
         </section>
@@ -1653,7 +1085,8 @@
         <section class="dashboard-section" id="launchpadPanel">
           <div class="grid">
             <div class="panel span-5">
-              <h3>Create Token</h3>
+              <h3>Token Launch Planner</h3>
+              <p class="meta">Build a launch draft for review. On-chain deployment requires a configured audited token factory.</p>
               <div class="field-grid">
                 <label>
                   Token Name
@@ -1671,18 +1104,18 @@
                   Decimals
                   <input id="launchDecimals" type="number" step="1" value="18" />
                 </label>
-                <label style="grid-column: 1 / -1;">
+                <label class="label-grid-col-full">
                   Description
                   <textarea id="launchDesc" placeholder="Describe the token utility and roadmap."></textarea>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
-                <button type="button" data-action="create-token">Deploy Token</button>
+              <div class="button-row margin-top-12">
+                <button type="button" data-action="create-token">Create Draft</button>
               </div>
-              <div class="assistant-log" id="launchResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="launchResult"></div>
             </div>
             <div class="table-card span-7">
-              <h3>Active Launches</h3>
+              <h3>Demo & Draft Launches</h3>
               <table>
                 <thead>
                   <tr>
@@ -1720,11 +1153,11 @@
             <div class="panel span-4">
               <h3>Create Proposal</h3>
               <div class="field-grid">
-                <label style="grid-column: 1 / -1;">
+                <label class="label-grid-col-full">
                   Title
                   <input id="proposalTitle" type="text" placeholder="Increase ATX staking rewards" />
                 </label>
-                <label style="grid-column: 1 / -1;">
+                <label class="label-grid-col-full">
                   Description
                   <textarea id="proposalDesc" placeholder="Describe the proposal and expected impact."></textarea>
                 </label>
@@ -1737,12 +1170,12 @@
                   </select>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="submit-proposal">Submit Proposal</button>
               </div>
             </div>
             <div class="table-card span-8">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <h3>Proposals</h3>
                 <button type="button" class="secondary" data-action="refresh-proposals">Refresh</button>
               </div>
@@ -1826,7 +1259,7 @@
           <div class="grid">
             <div class="table-card span-8">
               <h3>Market Pulse</h3>
-              <div style="margin-bottom: 16px;">
+              <div class="margin-bottom-16">
                 <h4 class="section-title">Recent Activity</h4>
                 <div id="recentActivityList"></div>
               </div>
@@ -1868,14 +1301,14 @@
                   <input id="quickTradeAmount" type="number" step="0.0001" placeholder="0.25" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="quick-buy">Quick Buy</button>
                 <button type="button" class="secondary" data-action="quick-sell">Quick Sell</button>
               </div>
-              <div class="assistant-log" id="quickTradeStatus" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="quickTradeStatus"></div>
             </div>
             <div class="panel span-8">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Gas Tracker</h3>
                   <p class="meta">Monitor simulated Ethereum transaction fees across speed tiers.</p>
@@ -1944,13 +1377,13 @@
                   <input id="riskStop" type="number" step="0.0001" placeholder="64000" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="calc-risk">Calculate Risk</button>
               </div>
-              <div class="assistant-log" id="riskResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="riskResult"></div>
             </div>
             <div class="table-card span-6">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Order Book</h3>
                   <p class="meta">Simulated bid and ask levels for the active trading session.</p>
@@ -1967,10 +1400,10 @@
                 </thead>
                 <tbody id="orderbookBody"></tbody>
               </table>
-              <div class="assistant-log" id="orderbookSummary" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="orderbookSummary"></div>
             </div>
             <div class="table-card span-6">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Trade History</h3>
                   <p class="meta">Review the latest simulated fills across core spot pairs.</p>
@@ -1996,7 +1429,7 @@
         <section class="dashboard-section" id="journalPanel">
           <div class="grid">
             <div class="panel span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Trading Journal</h3>
                   <p class="meta">Capture executions, notes and performance patterns for every setup.</p>
@@ -2039,12 +1472,12 @@
                     <option value="Breakeven">Breakeven</option>
                   </select>
                 </label>
-                <label style="grid-column: span 2;">
+                <label class="label-grid-col-span-2">
                   Notes
                   <textarea id="journalNotes" rows="3" placeholder="What went well? What to improve?"></textarea>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="add-journal-entry">Save Entry</button>
               </div>
             </div>
@@ -2094,7 +1527,7 @@
 
         <section class="dashboard-section" id="watchlistPanel">
           <div class="table-card span-12">
-            <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div class="toolbar toolbar-space-between margin-bottom-12">
               <div>
                 <h3>Watchlist</h3>
                 <p class="meta">Track symbols you want to monitor closely.</p>
@@ -2139,7 +1572,7 @@
                   </select>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="create-alert">Create Alert</button>
               </div>
             </div>
@@ -2306,51 +1739,34 @@
 
         <section class="dashboard-section" id="hardhatPanel">
           <div class="grid">
-            <!-- Deploy Controls -->
             <div class="panel span-6">
-              <h3>🏗️ AtlasX Local Network</h3>
-              <p class="meta">Deploy and interact with the AtlasX DEX on Hardhat local node (port 8545).</p>
-              <div class="button-row" style="margin-bottom:12px;">
-                <button type="button" data-action="hardhat-deploy-all">🚀 Deploy All Contracts</button>
-                <button type="button" class="secondary" data-action="hardhat-check-node">📡 Check Node</button>
+              <h3>🏗️ ATLASX3 Contract Workspace</h3>
+              <p class="meta">Compile, deploy, and inspect the local asset registry on the configured Hardhat node.</p>
+              <div id="hardhatStatus" class="status-chip" aria-live="polite">Sign in to check workspace</div>
+              <div class="button-row margin-bottom-12">
+              <button type="button" id="hardhatCompileBtn" class="secondary" data-action="hardhat-compile">Compile</button>
+              <button type="button" id="hardhatDeployBtn" data-action="hardhat-deploy-all" disabled>Deploy Registry</button>
+              <button type="button" class="secondary" data-action="hardhat-check-node">📡 Check Node</button>
               </div>
-              <div class="assistant-log" id="hardhatDeployLog" style="min-height:60px;"></div>
-
-              <h4 style="margin-top:16px;">Mint ATX Token</h4>
-              <div class="field-grid">
-                <label>Recipient <input id="atxMintTo" type="text" placeholder="0x..." /></label>
-                <label>Amount <input id="atxMintAmount" type="number" value="1000" /></label>
-              </div>
-              <button type="button" data-action="hardhat-mint-atx" style="margin-top:8px;">Mint ATX</button>
-              <div class="assistant-log" id="hardhatMintLog" style="margin-top:8px; min-height:0;"></div>
+              <div class="assistant-log min-height-60" id="hardhatDeployLog"></div>
             </div>
 
-            <!-- DEX Operations -->
             <div class="panel span-6">
-              <h3>💱 DEX Operations</h3>
-
-              <h4>Create Pair</h4>
+              <h3>Register Asset</h3>
+              <p class="meta">Write validated asset metadata to the deployed local registry.</p>
+              <form id="hardhatAssetForm">
               <div class="field-grid">
-                <label>Token A <input id="dexTokenA" type="text" placeholder="0x..." /></label>
-                <label>Token B <input id="dexTokenB" type="text" placeholder="0x..." /></label>
+                <label>Symbol <input name="symbol" type="text" maxlength="12" placeholder="ATX" required /></label>
+                <label>Name <input name="name" type="text" maxlength="80" placeholder="AtlasX Token" required /></label>
+                <label class="label-grid-col-full">Metadata URI <input name="metadataUri" type="url" placeholder="https://… or ipfs://…" /></label>
               </div>
-              <button type="button" data-action="hardhat-create-pair" style="margin-top:8px;">Create Pair</button>
-
-              <h4 style="margin-top:16px;">Add Liquidity</h4>
-              <div class="field-grid">
-                <label>Token A <input id="liqTokenA" type="text" placeholder="0x..." /></label>
-                <label>Token B <input id="liqTokenB" type="text" placeholder="0x..." /></label>
-                <label>Amount A <input id="liqAmountA" type="number" value="1000" /></label>
-                <label>Amount B <input id="liqAmountB" type="number" value="1000" /></label>
-              </div>
-              <button type="button" data-action="hardhat-add-liquidity" style="margin-top:8px;">Add Liquidity</button>
-              <div class="assistant-log" id="hardhatDexLog" style="margin-top:8px; min-height:0;"></div>
+              <button id="hardhatRegisterBtn" type="submit" disabled>Register Asset</button>
+              </form>
             </div>
 
-            <!-- Deployed Contracts Table -->
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content:space-between; align-items:center;">
-                <h3>📋 Deployed Contracts</h3>
+              <div class="toolbar toolbar-space-between">
+                <h3>📋 Registry Resources</h3>
                 <button type="button" data-action="hardhat-refresh-contracts">🔄 Refresh</button>
               </div>
               <table>
@@ -2367,9 +1783,8 @@
               </table>
             </div>
 
-            <!-- Hardhat Accounts -->
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content:space-between; align-items:center;">
+              <div class="toolbar toolbar-space-between">
                 <h3>👛 Test Accounts</h3>
                 <button type="button" data-action="hardhat-load-accounts">Load Accounts</button>
               </div>
@@ -2381,13 +1796,12 @@
               </table>
             </div>
           </div>
-          <form id="hardhatAssetForm" hidden></form>
         </section>
 
         <section class="dashboard-section" id="assistantPanel">
           <div class="grid">
             <div class="panel span-5">
-              <h3>AtlasX Assistant</h3>
+              <h3>ATLASX3 Assistant</h3>
               <form id="assistantForm">
                 <label>
                   Ask the desk
@@ -2406,13 +1820,13 @@
         <section class="dashboard-section" id="leaderboardPanel">
           <div class="grid">
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Leaderboard</h3>
                   <p class="meta">Track top traders, gainers and high-volume performers.</p>
                 </div>
                 <div class="toolbar">
-                  <select id="lbPeriod">
+                  <select id="lbPeriod" title="Leaderboard period" aria-label="Leaderboard period">
                     <option value="7d">7d</option>
                     <option value="30d" selected>30d</option>
                     <option value="90d">90d</option>
@@ -2445,7 +1859,8 @@
         <section class="dashboard-section" id="bridgePanel">
           <div class="grid">
             <div class="panel span-6">
-              <h3>Cross-chain Bridge</h3>
+              <h3>Cross-chain Bridge Planner</h3>
+              <p class="meta">Estimate a transfer route before signing with a supported external bridge wallet. ATLASX3 does not fabricate or submit bridge transactions.</p>
               <div class="field-grid">
                 <label>
                   From Network
@@ -2482,23 +1897,22 @@
                   Amount
                   <input id="bridgeAmount" type="number" step="0.0001" placeholder="0.5" />
                 </label>
-                <label style="grid-column: 1 / -1;">
+                <label class="label-grid-col-full">
                   Recipient address
                   <input id="bridgeRecipient" type="text" placeholder="Destination wallet address" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
-                <button type="button" class="secondary" data-action="bridge-estimate">Estimate Fee</button>
-                <button type="button" data-action="bridge-initiate">Initiate Bridge</button>
+              <div class="button-row margin-top-12">
+                <button type="button" data-action="bridge-estimate">Create Transfer Plan</button>
               </div>
-              <div class="assistant-log" id="bridgeFeeResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="bridgeFeeResult"></div>
             </div>
             <div class="table-card span-6">
-              <h3>Bridge History</h3>
+              <h3>Transfer Plans</h3>
               <table>
                 <thead>
                   <tr>
-                    <th>TxHash</th>
+                    <th>Reference</th>
                     <th>From</th>
                     <th>To</th>
                     <th>Token</th>
@@ -2538,7 +1952,7 @@
                       Leverage
                       <input id="futuresLeverage" type="number" min="1" max="100" value="10" />
                     </label>
-                    <label style="grid-column: 1 / -1;">
+                    <label class="label-grid-col-full">
                       Direction
                       <div class="button-row">
                         <button type="button" class="secondary active" data-action="futures-long">Long 🟢</button>
@@ -2565,14 +1979,14 @@
                       <input id="futuresSl" type="number" step="0.01" placeholder="Optional SL" />
                     </label>
                   </div>
-                  <div class="button-row" style="margin-top: 12px;">
+                  <div class="button-row margin-top-12">
                     <button type="button" data-action="open-futures-long">Open Long</button>
                     <button type="button" class="secondary" data-action="open-futures-short">Open Short</button>
                   </div>
-                  <div class="assistant-log" id="futuresResult" style="margin-top: 12px; min-height: 0;"></div>
+                  <div class="assistant-log margin-top-12 min-height-0" id="futuresResult"></div>
                 </div>
                 <div class="table-card span-6">
-                  <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <div class="toolbar toolbar-space-between margin-bottom-12">
                     <h3>Open Positions</h3>
                     <button type="button" class="secondary" data-action="refresh-futures">Refresh Positions</button>
                   </div>
@@ -2617,7 +2031,7 @@
             <div class="panel span-6" id="paymentFormCard">
               <h4 id="pgFormTitle">Card Payment</h4>
               <div class="field-grid" id="pgFields"></div>
-              <div class="field-grid" style="margin-top: 12px;">
+              <div class="field-grid margin-top-12">
                 <label>Amount
                   <input id="pgAmount" type="number" step="0.01" placeholder="100.00" />
                 </label>
@@ -2629,31 +2043,31 @@
                   </select>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="pg-submit">Pay Now</button>
                 <button type="button" class="secondary" data-action="pg-estimate">Estimate Fee</button>
               </div>
-              <div class="assistant-log" id="pgResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="pgResult"></div>
             </div>
 
             <div class="panel span-6" id="pgQrCard">
               <h4>Payment Summary</h4>
-              <div id="pgQrDisplay" style="text-align: center; padding: 20px 0;">
-                <div style="font-size: 48px; margin-bottom: 12px;">💳</div>
+              <div id="pgQrDisplay" class="qr-display">
+                <div class="qr-icon">💳</div>
                 <p class="meta">Select a payment method and enter amount to proceed</p>
               </div>
-              <div id="pgInstructions" class="assistant-log" style="min-height: 0;"></div>
+              <div id="pgInstructions" class="assistant-log min-height-0"></div>
 
-              <h4 style="margin-top: 16px;">Saved Payment Methods</h4>
-              <div id="savedMethodsList" class="assistant-log" style="min-height: 40px;"></div>
-              <div class="button-row" style="margin-top: 8px;">
+              <h4 class="margin-top-16">Saved Payment Methods</h4>
+              <div id="savedMethodsList" class="assistant-log min-height-40"></div>
+              <div class="button-row margin-top-8">
                 <button type="button" class="secondary" data-action="save-payment-method">+ Save Method</button>
                 <button type="button" class="secondary" data-action="load-saved-methods">Refresh</button>
               </div>
             </div>
 
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center;">
+              <div class="toolbar toolbar-space-between">
                 <h3>Transaction History</h3>
                 <div class="button-row">
                   <button type="button" data-action="load-payment-history">🔄 Refresh</button>
@@ -2722,7 +2136,7 @@
                 </div>
                 <button type="submit">Process payment</button>
               </form>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" class="secondary" data-action="load-terminal-transactions">Load transactions</button>
               </div>
               <div class="assistant-log" id="terminalResult"></div>
@@ -2730,16 +2144,16 @@
             <div class="panel span-6">
               <h3>Security</h3>
               <div class="field-grid">
-                <label style="display: flex; align-items: center; gap: 10px;">
-                  <input id="toggle2fa" type="checkbox" style="width: auto;" />
+                <label class="checkbox-label">
+                  <input id="toggle2fa" type="checkbox" class="checkbox-input" />
                   <span>Enable Two-Factor Authentication</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 10px;">
-                  <input id="toggleLoginNotif" type="checkbox" style="width: auto;" />
+                <label class="checkbox-label">
+                  <input id="toggleLoginNotif" type="checkbox" class="checkbox-input" />
                   <span>Login Notifications</span>
                 </label>
               </div>
-              <div style="margin-top: 16px;">
+              <div class="margin-top-16">
                 <h4 class="section-title">Change Password</h4>
                 <div class="field-grid">
                   <label>
@@ -2755,10 +2169,10 @@
                     <input id="confirmPassword" type="password" placeholder="Confirm password" />
                   </label>
                 </div>
-                <div class="button-row" style="margin-top: 12px;">
+                <div class="button-row margin-top-12">
                   <button type="button" data-action="change-password">Change Password</button>
                 </div>
-                <div class="assistant-log" id="passwordChangeResult" style="margin-top: 12px; min-height: 0;"></div>
+                <div class="assistant-log margin-top-12 min-height-0" id="passwordChangeResult"></div>
               </div>
             </div>
             <div class="panel span-6">
@@ -2782,7 +2196,7 @@
                   </select>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="save-display-prefs">Save Preferences</button>
               </div>
             </div>
@@ -2819,10 +2233,10 @@
                   </select>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="run-convert">Convert</button>
               </div>
-              <div class="assistant-log" id="convertResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="convertResult"></div>
             </div>
           </div>
         </section>
@@ -2855,10 +2269,10 @@
                   </select>
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="stake-asset">Stake Now</button>
               </div>
-              <div class="assistant-log" id="stakeResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="stakeResult"></div>
             </div>
             <div class="table-card span-6">
               <h3>Active Stakes</h3>
@@ -2882,14 +2296,14 @@
         <section class="dashboard-section" id="nftPanel">
           <div class="grid">
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>NFT Gallery</h3>
                   <p class="meta">Load mock wallet collectibles and mint ERC-1155 assets.</p>
                 </div>
                 <div class="toolbar">
                   <input id="nftWalletInput" type="text" placeholder="Wallet address..." />
-                  <select id="nftNetwork">
+                  <select id="nftNetwork" title="NFT network" aria-label="NFT network">
                     <option value="ETH">ETH</option>
                     <option value="BSC">BSC</option>
                     <option value="TRON">TRON</option>
@@ -2919,10 +2333,10 @@
                   <input id="nftMintUri" type="text" placeholder="ipfs://..." />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="mint-nft">Mint NFT</button>
               </div>
-              <div class="assistant-log" id="nftMintResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="nftMintResult"></div>
             </div>
           </div>
         </section>
@@ -2930,7 +2344,7 @@
         <section class="dashboard-section" id="optionsPanel">
           <div class="grid layout">
             <div class="panel span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: end; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between-end margin-bottom-12">
                 <div>
                   <h3>Options Trading</h3>
                   <p class="meta">Load a mock chain, simulate entries and monitor open derivatives exposure.</p>
@@ -2945,7 +2359,7 @@
                       <option value="BNB">BNB</option>
                     </select>
                   </label>
-                  <div class="button-row" style="margin-top: 28px;">
+                  <div class="button-row margin-top-28">
                     <button type="button" data-action="load-options-chain">Load Chain</button>
                     <button type="button" class="secondary" data-action="refresh-options">Refresh positions</button>
                   </div>
@@ -2990,7 +2404,7 @@
         <section class="dashboard-section" id="lendingPanel">
           <div class="grid layout">
             <div class="panel span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>Lending / Borrow</h3>
                   <p class="meta">Supply capital, borrow against collateral and monitor account risk locally.</p>
@@ -3015,11 +2429,11 @@
                   <input id="lendAmount" type="number" step="0.0001" placeholder="1000" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="supply-asset">Supply Asset</button>
               </div>
-              <div class="assistant-log" id="lendResult" style="margin-top: 12px; min-height: 0;"></div>
-              <table style="margin-top: 12px;">
+              <div class="assistant-log margin-top-12 min-height-0" id="lendResult"></div>
+              <table class="margin-top-12">
                 <thead>
                   <tr>
                     <th>Asset</th>
@@ -3057,11 +2471,11 @@
                   <input id="borrowAmount" type="number" step="0.0001" placeholder="250" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="borrow-asset">Borrow Asset</button>
               </div>
-              <div class="assistant-log" id="borrowResult" style="margin-top: 12px; min-height: 0;"></div>
-              <table style="margin-top: 12px;">
+              <div class="assistant-log margin-top-12 min-height-0" id="borrowResult"></div>
+              <table class="margin-top-12">
                 <thead>
                   <tr>
                     <th>Asset</th>
@@ -3079,7 +2493,7 @@
         <section class="dashboard-section" id="taxPanel">
           <div class="grid layout">
             <div class="panel span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: end; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between-end margin-bottom-12">
                 <div>
                   <h3>Tax &amp; Reporting</h3>
                   <p class="meta">Generate a mock gain/loss report and export the resulting ledger.</p>
@@ -3101,7 +2515,7 @@
                       <option value="HIFO">HIFO</option>
                     </select>
                   </label>
-                  <div class="button-row" style="margin-top: 28px;">
+                  <div class="button-row margin-top-28">
                     <button type="button" data-action="generate-tax-report">Generate Report</button>
                   </div>
                 </div>
@@ -3126,7 +2540,7 @@
               </div>
             </div>
             <div class="table-card span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <h3>Transactions</h3>
                 <div class="button-row">
                   <button type="button" class="secondary" data-action="export-tax-csv" id="exportTaxCsvBtn" disabled>Export CSV</button>
@@ -3160,16 +2574,16 @@
                   Key Name
                   <input id="apiKeyName" type="text" placeholder="Desk automation" />
                 </label>
-                <label style="display: flex; align-items: center; gap: 10px;">
-                  <input id="permRead" type="checkbox" style="width: auto;" checked />
+                <label class="checkbox-label">
+                  <input id="permRead" type="checkbox" class="checkbox-input" checked />
                   <span>Read</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 10px;">
-                  <input id="permTrade" type="checkbox" style="width: auto;" />
+                <label class="checkbox-label">
+                  <input id="permTrade" type="checkbox" class="checkbox-input" />
                   <span>Trade</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 10px;">
-                  <input id="permWithdraw" type="checkbox" style="width: auto;" />
+                <label class="checkbox-label">
+                  <input id="permWithdraw" type="checkbox" class="checkbox-input" />
                   <span>Withdraw</span>
                 </label>
                 <label>
@@ -3177,11 +2591,11 @@
                   <input id="apiKeyIp" type="text" placeholder="203.0.113.10, 198.51.100.4" />
                 </label>
               </div>
-              <div class="button-row" style="margin-top: 12px;">
+              <div class="button-row margin-top-12">
                 <button type="button" data-action="create-api-key">Create New Key</button>
                 <button type="button" class="secondary" data-action="refresh-api-keys">Refresh Keys</button>
               </div>
-              <div class="assistant-log" id="apiKeyResult" style="margin-top: 12px; min-height: 0;"></div>
+              <div class="assistant-log margin-top-12 min-height-0" id="apiKeyResult"></div>
             </div>
             <div class="table-card span-12">
               <table>
@@ -3205,7 +2619,7 @@
         <section class="dashboard-section" id="statusPanel">
           <div class="grid layout">
             <div class="panel span-12">
-              <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="toolbar toolbar-space-between margin-bottom-12">
                 <div>
                   <h3>System Health / Status</h3>
                   <p class="meta">Monitor backend, network and infrastructure status with automatic refreshes.</p>
@@ -3259,10 +2673,10 @@
             </div>
           </div>
           <div class="table-card span-12">
-            <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div class="toolbar toolbar-space-between margin-bottom-12">
               <h3>Top Performing Pairs</h3>
               <div class="toolbar">
-                <select id="analyticsRange">
+                <select id="analyticsRange" title="Analytics time range" aria-label="Analytics time range">
                   <option value="7d">7d</option>
                   <option value="30d">30d</option>
                   <option value="90d">90d</option>
@@ -3411,8 +2825,8 @@
     </div>
 
     <div id="shortcutsOverlay" class="shortcuts-overlay" hidden></div>
-    <div id="shortcutsModal" hidden style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9999; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:24px; min-width:320px; box-shadow: var(--shadow);">
-      <div class="toolbar" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+    <div id="shortcutsModal" class="shortcuts-modal" hidden>
+      <div class="toolbar toolbar-space-between margin-bottom-12">
         <strong>⌨️ Keyboard Shortcuts</strong>
         <button type="button" class="secondary" data-action="close-shortcuts">Close</button>
       </div>
@@ -3421,9 +2835,10 @@
       <div class="shortcut-row"><span>Go to Trading</span><span class="shortcut-key">G + T</span></div>
       <div class="shortcut-row"><span>Go to Wallet</span><span class="shortcut-key">G + W</span></div>
       <div class="shortcut-row"><span>Close modal</span><span class="shortcut-key">ESC</span></div>
-      <div class="shortcut-row" style="border-bottom: 0;"><span>Focus search</span><span class="shortcut-key">/</span></div>
+      <div class="shortcut-row no-border-bottom"><span>Focus search</span><span class="shortcut-key">/</span></div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

@@ -2,5 +2,6 @@
   "terminal.integrated.env.linux": {
     "PATH": "/config/node-v22.14.0-linux-x64/bin:${env:PATH}"
   },
-  "codeQL.createQuery.qlPackLocation": "/config/workspace"
+  "codeQL.createQuery.qlPackLocation": "/config/workspace",
+  "cSpell.words": ["APIKEY", "forex", "klines", "METATRADER", "OHLCV"]
 }

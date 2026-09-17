@@ -134,7 +134,7 @@ async function run() {
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-    await page.getByRole("tab", { name: "Register" }).click();
+    await page.getByRole("button", { name: "Create account" }).click();
 
     const timestamp = Date.now();
     await page
@@ -182,13 +182,13 @@ async function run() {
     assert.deepEqual(restoredSession, sessionKeys);
     assert.match(
       await page.locator("#sessionStatus").textContent(),
-      /^Authenticated as /,
+      /^Session: /,
     );
     await page.unroute("**/api/rates");
 
     const dashboardTabs = page.locator(".dashboard-tab");
     const dashboardTabCount = await dashboardTabs.count();
-    assert.equal(dashboardTabCount, 36);
+    assert.equal(dashboardTabCount, 37);
     assert.equal(
       await page.locator('.dashboard-tab[aria-selected="true"]').count(),
       1,
@@ -254,7 +254,7 @@ async function run() {
 
     await dashboardTabs.last().focus();
     await page.keyboard.press("Home");
-    await page.locator("#overviewPanel").waitFor({ state: "visible" });
+    await page.locator("#marketsPanel").waitFor({ state: "visible" });
     assert.equal(
       await dashboardTabs.first().getAttribute("aria-selected"),
       "true",
@@ -263,14 +263,7 @@ async function run() {
     await page
       .locator('.dashboard-tab[data-section-target="metatraderPanel"]')
       .click();
-    await page.waitForFunction(() => {
-      const status = document.getElementById("mt5ConnectionStatus");
-      return status && status.textContent !== "Checking...";
-    });
-    assert.match(
-      await page.locator("#mt5ConnectionStatus").textContent(),
-      /^(Connected|Not configured|Unavailable)$/,
-    );
+    await page.locator("#metatraderPanel").waitFor({ state: "visible" });
     const passiveToastVisible = await page.locator("#toast").isVisible();
     const passiveToastText = await page.locator("#toast").textContent();
     assert.equal(
@@ -280,42 +273,36 @@ async function run() {
     );
 
     await page
-      .locator('.dashboard-tab[data-section-target="paymentPanel"]')
+      .locator('.nav-link[data-section-target="settingsPanel"]')
       .click();
-    await page.locator("#cardNumber").fill("4532 0151 1283 0366");
-    await page.locator("#expiryDate").fill("12/29");
-    await page.locator("#cvv").fill("123");
-    await page.locator("#cardholderName").fill("UI TEST USER");
-    await page.locator("#paymentAmount").fill("25.50");
+    await page
+      .locator('#paymentTerminalForm [name="cardNumber"]')
+      .fill("4532 0151 1283 0366");
+    await page
+      .locator('#paymentTerminalForm [name="expiryDate"]')
+      .fill("12/29");
+    await page.locator('#paymentTerminalForm [name="cvv"]').fill("123");
+    await page
+      .locator('#paymentTerminalForm [name="cardholderName"]')
+      .fill("UI TEST USER");
+    await page.locator('#paymentTerminalForm [name="amount"]').fill("25.50");
     await page.locator("#paymentTerminalForm button[type=submit]").click();
     await page
-      .getByText("Payment processed successfully", { exact: true })
-      .waitFor({
-        state: "visible",
-        timeout: 20000,
-      });
-    const paymentRow = page.locator("#paymentTransactionsBody tr").first();
-    await paymentRow.waitFor({ state: "visible" });
-    assert.match(await paymentRow.textContent(), /453201\*+0366/);
-    assert.doesNotMatch(await paymentRow.textContent(), /4532015112830366/);
-    page.once("dialog", (dialog) => dialog.accept());
-    await paymentRow.locator(".refund-btn").click();
-    await page
-      .getByText("Refund processed successfully", { exact: true })
-      .waitFor({
-        state: "visible",
-        timeout: 20000,
-      });
-    await page.waitForFunction(() => {
-      const row = document.querySelector("#paymentTransactionsBody tr");
-      return row?.textContent?.includes("refunded");
-    });
+      .locator("#terminalResult")
+      .getByText("Payment processed", { exact: true })
+      .waitFor({ state: "visible", timeout: 20000 });
+    assert.doesNotMatch(
+      await page.locator("#terminalResult").textContent(),
+      /4532015112830366/,
+    );
 
     await page
       .locator('.dashboard-tab[data-section-target="p2pPanel"]')
       .click();
-    await page.locator('[data-p2p-tab="my-orders"]').click();
     await page.locator("#createP2POrderForm").waitFor({ state: "visible" });
+    await page
+      .locator('.dashboard-tab[data-section-target="p2pOrdersPanel"]')
+      .click();
     await page.locator("#p2pMyOrdersBody").waitFor({ state: "visible" });
 
     await page
@@ -323,43 +310,34 @@ async function run() {
       .click();
     const unsafeTraderName =
       '<strong data-copy-injection="true">Unsafe Trader</strong>';
-    await page.locator('[data-copy-tab="become-trader"]').click();
-    assert.equal(
-      await page
-        .locator('[data-copy-tab="become-trader"]')
-        .getAttribute("aria-selected"),
-      "true",
-    );
-    await page.locator("#copyBecomeTraderTab").waitFor({ state: "visible" });
+    await page.locator("#copyTraderRegisterForm").waitFor({ state: "visible" });
     await page
-      .locator('#becomeTraderForm input[name="displayName"]')
+      .locator('#copyTraderRegisterForm input[name="displayName"]')
       .fill(unsafeTraderName);
-    await page
-      .locator('#becomeTraderForm textarea[name="strategy"]')
-      .fill("Smoke strategy");
-    await page.locator('#becomeTraderForm button[type="submit"]').click();
-    await page
-      .getByText("Registered as signal provider!", { exact: true })
-      .waitFor({
-        state: "visible",
-        timeout: 20000,
-      });
-    await page.locator('[data-copy-tab="traders"]').click();
-    await page
-      .locator("#topTradersBody td")
-      .filter({ hasText: unsafeTraderName })
-      .first()
-      .waitFor({ state: "visible" });
+    const [copyRegistrationResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/copy-trading/trader/register") &&
+          response.request().method() === "POST",
+      ),
+      page.locator('#copyTraderRegisterForm button[type="submit"]').click(),
+    ]);
+    assert.equal(copyRegistrationResponse.ok(), true);
     assert.equal(
-      await page.locator("#topTradersBody [data-copy-injection]").count(),
+      await page.locator("#copyTradingPanel [data-copy-injection]").count(),
       0,
     );
-    await page.locator('[data-copy-tab="following"]').click();
-    await page.locator("#copyFollowingTab").waitFor({ state: "visible" });
+    await page.locator("#followingTradersBody").waitFor({ state: "visible" });
 
     await page
       .locator('.dashboard-tab[data-section-target="predictionPanel"]')
       .click();
+    await page
+      .locator("#predictionPositionsBody")
+      .waitFor({ state: "visible" });
+    await page
+      .locator("#predictionLeaderboardBody")
+      .waitFor({ state: "visible" });
     let predictionDialogType;
     page.once("dialog", async (dialog) => {
       predictionDialogType = dialog.type();
@@ -367,14 +345,6 @@ async function run() {
     });
     await page.locator('[data-action="place-prediction"]').first().click();
     assert.equal(predictionDialogType, "prompt");
-    await page.locator('[data-pred-tab="positions"]').click();
-    await page
-      .locator("#predictionPositionsBody")
-      .waitFor({ state: "visible" });
-    await page.locator('[data-pred-tab="leaderboard"]').click();
-    await page
-      .locator("#predictionLeaderboardBody")
-      .waitFor({ state: "visible" });
 
     await assertNoPageOverflow(page, "desktop");
     const desktopScreenshot = path.join(

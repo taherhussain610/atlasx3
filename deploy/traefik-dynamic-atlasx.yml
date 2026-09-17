@@ -1,0 +1,14 @@
+http:
+  routers:
+    atlasx:
+      rule: "Host(`atlasx.online`) || Host(`www.atlasx.online`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      service: atlasx
+  services:
+    atlasx:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:4000"

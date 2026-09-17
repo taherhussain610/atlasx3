@@ -72,7 +72,7 @@ class PortfolioOptimizationService {
   /**
    * Generate portfolio recommendations based on profile
    */
-  generateRecommendations(profile, holdings, prices) {
+  generateRecommendations(profile, _holdings, _prices) {
     const recommendations = [];
 
     // Age-based recommendation
@@ -124,7 +124,7 @@ class PortfolioOptimizationService {
 
     // Simplified: equal weight is often close to minimum variance
     const equalWeights = Array(n).fill(1 / n);
-    let variance = this.calculatePortfolioVariance(equalWeights, holdings);
+    const variance = this.calculatePortfolioVariance(equalWeights, holdings);
 
     if (variance < minVariance) {
       minVariance = variance;
@@ -219,10 +219,10 @@ class PortfolioOptimizationService {
   /**
    * Momentum-based rebalancing suggestion
    */
-  suggestMomentumRebalancing(portfolio, prices, momentum) {
+  suggestMomentumRebalancing(portfolio, _prices, momentum) {
     const suggestions = [];
 
-    Object.entries(portfolio).forEach(([symbol, data]) => {
+    Object.entries(portfolio).forEach(([symbol, _data]) => {
       const assetMomentum = momentum[symbol] || 0;
 
       if (assetMomentum > 0.1) {
@@ -257,7 +257,7 @@ class PortfolioOptimizationService {
     return weights.map((w) => w / sum);
   }
 
-  optimizeWeights(holdings, prices, targetReturn) {
+  optimizeWeights(holdings, _prices, _targetReturn) {
     // Simplified: return equal weights
     return Array(holdings.length).fill(1 / holdings.length);
   }
